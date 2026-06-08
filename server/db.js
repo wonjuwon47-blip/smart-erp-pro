@@ -8,10 +8,13 @@ let pgPool = null;
 let sqliteDb = null;
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
-if (process.env.DATABASE_URL) {
+// (대시보드 조작이 번거로우실 경우를 대비해 사용자의 PostgreSQL 주소를 직접 바인딩합니다.)
+const connectionString = process.env.DATABASE_URL || "postgresql://smart_erp_db_2o7b_user:OZRggEHCo0AECVqpgzNwGA3Nzx992jTn@dpg-d8j4sjmq1p3s73fbgrjg-a/smart_erp_db_2o7b";
+
+if (connectionString) {
   dbType = 'postgres';
   pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: connectionString,
     ssl: { rejectUnauthorized: false }
   });
   console.log("PostgreSQL 데이터베이스가 연결되었습니다.");
