@@ -24,16 +24,22 @@ function reconstructLines(fields) {
   const lines = [];
   let currentLine = [];
   let currentY = -999;
-  const Y_THRESHOLD = 12; // 12픽셀 내외의 단어는 같은 행으로 취급
+  let currentHeight = 0;
   
   for (const field of sorted) {
-    const y = field.boundingPoly.vertices[0].y;
-    const x = field.boundingPoly.vertices[0].x;
+    const vertices = field.boundingPoly.vertices;
+    const y = vertices[0].y;
+    const x = vertices[0].x;
+    const h = (vertices[2] && vertices[0]) ? (vertices[2].y - vertices[0].y) : 15;
+    
+    // Y축 임계값: 단어 높이의 50%를 기준으로 하되, 최소 12픽셀 보장
+    const threshold = Math.max(12, h * 0.5);
     
     if (currentLine.length === 0) {
       currentLine.push({ x, text: field.inferText });
       currentY = y;
-    } else if (Math.abs(y - currentY) <= Y_THRESHOLD) {
+      currentHeight = h;
+    } else if (Math.abs(y - currentY) <= Math.max(threshold, Math.max(12, currentHeight * 0.5))) {
       currentLine.push({ x, text: field.inferText });
     } else {
       // 줄바꿈 발생: 기존 라인은 X축 기준으로 정렬하여 가로 글자 조합
@@ -43,6 +49,7 @@ function reconstructLines(fields) {
       // 새 라인 시작
       currentLine = [{ x, text: field.inferText }];
       currentY = y;
+      currentHeight = h;
     }
   }
   
@@ -71,7 +78,13 @@ function parseOcrText(text, lines) {
   let partnerName = "";
   for (const line of lines) {
     if (line.includes("상호") || line.includes("상 호") || line.includes("공급자") || line.includes("상호명")) {
-      const clean = line.replace(/상호명|상호|상 호|공급자|공급원|[:(]/g, "").trim();
+      // 공급받는자 정보가 같은 라인에 있으면 공급받는자 뒤쪽은 잘라냄 (공급자 상호만 추출하기 위함)
+      let lineForPartner = line;
+      if (line.includes("공급받는자") || line.includes("공급받는 자") || line.includes("공급 받는")) {
+        lineForPartner = line.split(/공급받는자|공급받는 자|공급 받는/)[0];
+      }
+      
+      const clean = lineForPartner.replace(/상호명|상호|상 호|공급자|공급원|[:(]/g, "").trim();
       const parts = clean.split(/\s+/);
       if (parts[0] && parts[0].length > 1) {
         partnerName = parts[0];
@@ -81,8 +94,11 @@ function parseOcrText(text, lines) {
   }
   
   if (!partnerName) {
+    // 공급받는자 키워드가 라인에 있는 경우 상호명 추출에서 제외
     for (let i = 0; i < Math.min(lines.length, 12); i++) {
       const line = lines[i];
+      if (line.includes("공급받는자") || line.includes("공급받는 자") || line.includes("공급 받는")) continue;
+      
       if (line.includes("주식회사") || line.includes("(주)") || line.includes("유통") || line.includes("상사") || line.includes("푸드") || line.includes("농산") || line.includes("수산")) {
         const match = line.match(/[가-힣A-Za-z0-9()]+/g);
         if (match) {
@@ -124,75 +140,99 @@ function parseOcrText(text, lines) {
     
     const tokens = line.split(/\s+/);
     if (tokens.length >= 3) {
-      let hasAmount = false;
-      let hasPrice = false;
-      let hasQty = false;
-      
-      let amountVal = 0;
-      let priceVal = 0;
-      let qtyVal = 0;
-      
+      const numTokens = [];
+      const numIndices = [];
       let tokenIdx = tokens.length - 1;
       
-      const lastToken = tokens[tokenIdx];
-      const cleanLast = lastToken.replace(/,/g, '');
-      const lastVal = cleanNumber(lastToken);
-      if (lastVal > 100 && /^\d+$/.test(cleanLast)) {
-        amountVal = lastVal;
-        hasAmount = true;
-        tokenIdx--;
-      }
-      
-      if (hasAmount && tokenIdx >= 0) {
-        const priceToken = tokens[tokenIdx];
-        const cleanPrice = priceToken.replace(/,/g, '');
-        const pVal = cleanNumber(priceToken);
-        if (pVal > 0 && /^\d+$/.test(cleanPrice)) {
-          priceVal = pVal;
-          hasPrice = true;
+      // 뒤에서부터 역순으로 탐색하여 연속된 숫자 토큰 수집
+      while (tokenIdx >= 0) {
+        const token = tokens[tokenIdx];
+        const cleanT = token.replace(/,/g, '');
+        if (/^\d+(\.\d+)?$/.test(cleanT)) {
+          numTokens.push(cleanT);
+          numIndices.push(tokenIdx);
           tokenIdx--;
+        } else {
+          break;
         }
       }
       
-      if (hasPrice && tokenIdx >= 0) {
-        const qtyToken = tokens[tokenIdx];
-        const cleanQty = qtyToken.replace(/,/g, '');
-        const qVal = cleanFloat(qtyToken);
-        if (qVal > 0 && /^\d+(\.\d+)?$/.test(cleanQty)) {
-          qtyVal = qVal;
-          hasQty = true;
-          tokenIdx--;
-        }
+      numTokens.reverse();
+      numIndices.reverse();
+      
+      const N = numTokens.length;
+      let qtyVal = 0;
+      let priceVal = 0;
+      let amountVal = 0;
+      let hasItem = false;
+      let nameEndIdx = tokens.length - 1;
+      
+      if (N >= 5) {
+        // 5단 구조: [수량] [단가] [공급가액] [부가세] [금액] -> 실질 공급가액(numTokens[2])을 amountVal로 사용
+        qtyVal = cleanFloat(numTokens[0]);
+        priceVal = cleanNumber(numTokens[1]);
+        amountVal = cleanNumber(numTokens[2]);
+        hasItem = (qtyVal > 0 && priceVal > 0 && amountVal > 0);
+        nameEndIdx = numIndices[0] - 1;
+      } else if (N === 4) {
+        // 4단 구조: [수량] [단가] [공급가액] [금액]
+        qtyVal = cleanFloat(numTokens[0]);
+        priceVal = cleanNumber(numTokens[1]);
+        amountVal = cleanNumber(numTokens[2]);
+        hasItem = (qtyVal > 0 && priceVal > 0 && amountVal > 0);
+        nameEndIdx = numIndices[0] - 1;
+      } else if (N === 3) {
+        // 3단 구조: [수량] [단가] [금액]
+        qtyVal = cleanFloat(numTokens[0]);
+        priceVal = cleanNumber(numTokens[1]);
+        amountVal = cleanNumber(numTokens[2]);
+        hasItem = (qtyVal > 0 && priceVal > 0 && amountVal > 0);
+        nameEndIdx = numIndices[0] - 1;
+      } else if (N === 2) {
+        // 2단 구조: [단가] [금액]
+        priceVal = cleanNumber(numTokens[0]);
+        amountVal = cleanNumber(numTokens[1]);
+        qtyVal = Math.round(amountVal / (priceVal || 1));
+        hasItem = (qtyVal > 0 && priceVal > 0 && amountVal > 0);
+        nameEndIdx = numIndices[0] - 1;
       }
       
-      // 대안 매칭 (순서 꼬였을 때 보완)
-      if (!hasQty && tokens.length >= 3) {
-        const numTokens = [];
-        const numIndices = [];
+      // 대안 매칭 (숫자 토큰 중간이 비어 있거나 역순 탐색으로 찾을 수 없을 때)
+      if (!hasItem) {
+        const allNumTokens = [];
+        const allNumIndices = [];
         tokens.forEach((t, index) => {
           const cleanT = t.replace(/,/g, '');
           if (/^\d+(\.\d+)?$/.test(cleanT)) {
-            numTokens.push(cleanT);
-            numIndices.push(index);
+            allNumTokens.push(cleanT);
+            allNumIndices.push(index);
           }
         });
         
-        if (numTokens.length >= 2) {
-          amountVal = cleanNumber(numTokens[numTokens.length - 1]);
-          priceVal = cleanNumber(numTokens[numTokens.length - 2]);
-          qtyVal = numTokens.length >= 3 ? cleanFloat(numTokens[numTokens.length - 3]) : Math.round(amountVal / (priceVal || 1));
+        if (allNumTokens.length >= 2) {
+          amountVal = cleanNumber(allNumTokens[allNumTokens.length - 1]);
+          priceVal = cleanNumber(allNumTokens[allNumTokens.length - 2]);
+          qtyVal = allNumTokens.length >= 3 ? cleanFloat(allNumTokens[allNumTokens.length - 3]) : Math.round(amountVal / (priceVal || 1));
           
-          if (qtyVal > 0 && priceVal > 0) {
-            hasAmount = true;
-            hasPrice = true;
-            hasQty = true;
-            tokenIdx = numIndices[numIndices.length - (numTokens.length >= 3 ? 3 : 2)] - 1;
+          if (qtyVal > 0 && priceVal > 0 && amountVal > 0) {
+            hasItem = true;
+            nameEndIdx = allNumIndices[allNumIndices.length - (allNumTokens.length >= 3 ? 3 : 2)] - 1;
           }
         }
       }
       
-      if (hasAmount && hasPrice && qtyVal > 0) {
-        const nameTokens = tokens.slice(0, tokenIdx + 1);
+      if (hasItem) {
+        const nameTokens = tokens.slice(0, nameEndIdx + 1);
+        
+        // NO 열(번호)이 맨 앞에 있으면 제거
+        if (nameTokens.length > 0 && /^\d+$/.test(nameTokens[0])) {
+          nameTokens.shift();
+        }
+        // 품목코드(예: F247554)가 맨 앞에 있으면 제거
+        if (nameTokens.length > 0 && /^[A-Z]\d{5,6}$/i.test(nameTokens[0])) {
+          nameTokens.shift();
+        }
+        
         const name = nameTokens.join(" ").trim();
         if (name && name.length > 1 && !/^\d+$/.test(name)) {
           parsedItems.push({
