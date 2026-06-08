@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "vite",
-    "build": "npm install --include=dev && npm install --prefix server && vite build",
+    "build": "npm install --prefix server",
     "preview": "vite preview",
     "install-all": "npm install && npm install --prefix server",
     "start": "node server/server.js"
