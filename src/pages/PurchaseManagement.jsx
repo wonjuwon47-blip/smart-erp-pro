@@ -214,23 +214,26 @@ export default function PurchaseManagement({ products, partners, invoices, onDat
 
     let partnerName = "";
     for (const line of lines) {
-      if (line.includes("상호") || line.includes("상 호") || line.includes("공급자") || line.includes("상호명")) {
+      const noSpaceLine = line.replace(/\s+/g, "");
+      if (noSpaceLine.includes("상호") || noSpaceLine.includes("공급자") || noSpaceLine.includes("상호명")) {
         // 공급받는자 정보가 같은 라인에 있으면 공급받는자 뒤쪽은 잘라냄 (공급자 상호만 추출하기 위함)
         let lineForPartner = line;
-        if (line.includes("공급받는자") || line.includes("공급받는 자") || line.includes("공급 받는")) {
-          lineForPartner = line.split(/공급받는자|공급받는 자|공급 받는/)[0];
+        const rxRecipient = /공\s*급\s*받\s*는\s*\s*자|공\s*급\s*받\s*는\s*자/;
+        if (rxRecipient.test(line)) {
+          lineForPartner = line.split(rxRecipient)[0];
         }
         
         const clean = lineForPartner.replace(/상호명|상호|상 호|공급자|공급원|[:(]/g, "").trim();
-        const parts = clean.split(/\s+/);
-        if (parts[0] && parts[0].length > 1) { partnerName = parts[0]; break; }
+        const parts = clean.split(/\s+/).filter(p => p.length > 1);
+        if (parts[0]) { partnerName = parts[0]; break; }
       }
     }
     if (!partnerName) {
       // 공급받는자 키워드가 라인에 있는 경우 상호명 추출에서 제외
       for (let i = 0; i < Math.min(lines.length, 12); i++) {
         const line = lines[i];
-        if (line.includes("공급받는자") || line.includes("공급받는 자") || line.includes("공급 받는")) continue;
+        const noSpaceLine = line.replace(/\s+/g, "");
+        if (noSpaceLine.includes("공급받는자")) continue;
         
         if (line.includes("주식회사") || line.includes("(주)") || line.includes("유통") || line.includes("상사") || line.includes("푸드") || line.includes("농산") || line.includes("수산")) {
           const match = line.match(/[가-힣A-Za-z0-9()]+/g);
@@ -354,6 +357,24 @@ export default function PurchaseManagement({ products, partners, invoices, onDat
           // 품목코드(예: F247554)가 맨 앞에 있으면 제거
           if (nameTokens.length > 0 && /^[A-Z]\d{5,6}$/i.test(nameTokens[0])) {
             nameTokens.shift();
+          }
+          
+          // 품목명 토큰 배열의 끝에서부터 단위/규격 성격의 토큰들을 제거
+          while (nameTokens.length > 0) {
+            const lastToken = nameTokens[nameTokens.length - 1];
+            const cleanLast = lastToken.toUpperCase();
+            
+            const isUnit = 
+              /^(EA|BOX|KG|PK|BAG|BTL|CAN|G)$/.test(cleanLast) ||
+              /^(EA|BOX|KG|PK|BAG|BTL|CAN|G)\(.*\)$/.test(cleanLast) ||
+              /^\(.*\)$/.test(cleanLast) ||
+              /^\d+(KG|G|MM|EA|BOX)$/.test(cleanLast);
+              
+            if (isUnit) {
+              nameTokens.pop();
+            } else {
+              break;
+            }
           }
           
           const name = nameTokens.join(" ").trim();
