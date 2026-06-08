@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart ERP Pro - 다중 사용자 클라우드 회계 솔루션</title>
+  
+  <!-- Google Fonts 로드 (Inter 및 Noto Sans KR) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <!-- 기존 ERP 글래스모피즘 테마 스타일시트 참조 -->
+  <link rel="stylesheet" href="/style.css">
+  
+  <!-- 인쇄 용지 규격 보정을 위한 Global Print Style (A5 Landscape 1페이지 강제 수용) -->
+  <style>
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* 화면에 보이는 ERP 돔 전체 숨김 */
+      #root {
+        display: none !important;
+      }
+      /* 인쇄용 영역 활성화 */
+      #print-document-area {
+        display: block !important;
+        background: #fff !important;
+      }
+      .print-page-wrapper {
+        page-break-after: always !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        border: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- React App SPA Mount Container -->
+  <div id="root"></div>
+
+  <!-- 거래명세서/라벨 통합 인쇄 전용 영역 (화면엔 숨김, 인쇄 시 활성) -->
+  <div id="print-document-area" style="display: none;"></div>
+
+  <!-- Vite React Module Entry Script -->
+  <script type="module" src="/src/main.jsx"></script>
+
+</body>
+</html>
