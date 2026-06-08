@@ -378,15 +378,18 @@ export default function PurchaseManagement({ products, partners, invoices, onDat
   const handleOcrMockFallback = (reason) => {
     console.warn("Fallback Triggered:", reason);
     const mockItems = [
-      { code: "337940", name: "상하목장 요구르트(100ml_유기농 100g/EA)", qty: 190, price: 340, unit: "EA", origin: "국내산" },
-      { code: "396562", name: "시투조아 카스테라단호박인절미", qty: 9, price: 14560, unit: "EA", origin: "국내산" },
-      { code: "124171", name: "이츠웰 밀품은또띠아(6인치_12장 240g/EA)", qty: 42, price: 2750, unit: "EA", origin: "국내산" }
+      { code: "F247554", name: "호두반태(미국산)", qty: 1.0, price: 5280, unit: "EA", origin: "미국산" },
+      { code: "F254088", name: "포기김치(국내산/종가_소백)BOX초속", qty: 5.0, price: 49980, unit: "EA", origin: "국내산" },
+      { code: "F298060", name: "(식자재용)베이컨_500g", qty: 1.0, price: 7200, unit: "EA", origin: "국내산" },
+      { code: "F318483", name: "총각김치(국내산/종가_금강)BOX초속", qty: 1.0, price: 48180, unit: "EA", origin: "국내산" },
+      { code: "F330253", name: "(식자재용)고춧가루_한식용_굵은_중국산_1kg", qty: 4.0, price: 8730, unit: "EA", origin: "중국산" },
+      { code: "F362033", name: "청정원순창재래식안심된장(대상)(과세)", qty: 1.0, price: 42590, unit: "EA", origin: "국내산" }
     ];
 
-    setOcrRawText(`[OCR 판독 제한으로 예제 데이터가 로드되었습니다]\n사유: ${reason}\n\n씨제이프레시웨이주식회사\n603-81-11270\n상하목장 요구르트 190개 단가 340원 금액 64,600원\n시투조아 카스테라단호박인절미 9개 단가 14,560원 금액 131,040원`);
-    setOcrCorrectPartner("씨제이프레시웨이주식회사");
-    setOcrCorrectDate(new Date().toISOString().substring(0, 10));
-    setOcrCorrectBizNo("603-81-11270");
+    setOcrRawText(`[클라우드 API 미설정으로 사조푸디스트 명세표 시뮬레이션 데이터가 로드되었습니다]\n사유: ${reason}\n\n사조푸디스트\n711-81-01637\n1 F247554 호두반태(미국산) EA(200G/EA/반태) 1.0 5,280 5,280 0 5,280\n2 F254088 포기김치(국내산/종가_소백)BOX초속 5.0 49,980 249,900 0 249,900\n3 F298060 (식자재용)베이컨_500g EA(500g/20/두께2mm) 1.0 7,200 7,200 720 7,920\n4 F318483 총각김치(국내산/종가_금강)BOX초속 1.0 48,180 48,180 0 48,180\n5 F330253 (식자재용)고춧가루_한식용_굵은_중국산_1kg 4.0 8,730 34,920 0 34,920\n6 F362033 청정원순창재래식안심된장(대상)(과세) EA(14KG/캔) 1.0 42,590 42,590 4,259 46,849`);
+    setOcrCorrectPartner("사조푸디스트");
+    setOcrCorrectDate("2026-06-05");
+    setOcrCorrectBizNo("711-81-01637");
     setOcrCorrectItems(mockItems.map(item => ({
       ...item,
       amount: item.qty * item.price
