@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invoiceApi, partnerApi } from '../services/api';
 import { Plus, Trash2, Printer, Search, Save, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function SalesManagement({ products, partners, invoices, onDataChange }) {
   const [salesCart, setSalesCart] = useState([]);
@@ -9,6 +10,11 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
   const [salesDate, setSalesDate] = useState(new Date().toISOString().substring(0, 10));
   const [status, setStatus] = useState('청구(외상)');
   const [invoiceList, setInvoiceList] = useState([]);
+  
+  // 엑셀 업로드 관련 상태
+  const [uploadedExcelRows, setUploadedExcelRows] = useState(null);
+  const [excelStatusText, setExcelStatusText] = useState('');
+  const [excelStatusColor, setExcelStatusColor] = useState('var(--text-muted)');
   
   // 신규 품목 추가 입력 필드
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -23,9 +29,209 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
     return new Intl.NumberFormat('ko-KR').format(num || 0);
   };
 
+  // --- 엑셀 단위 및 품명 정규화 (1000g/kg -> kg) ---
+  const sanitizeExcelUnitAndName = (str) => {
+    if (str === null || str === undefined) return "";
+    let s = String(str);
+    s = s.replace(/1000g\s*[\/\-\(]?\s*1?kg\s*\)?/gi, 'kg');
+    s = s.replace(/1000g/gi, 'kg');
+    return s;
+  };
+
+  // 엑셀에서 추출한 날짜를 'YYYY-MM-DD'로 안전하게 변환
+  const formatDateString = (val) => {
+    if (val === null || val === undefined || val === "") return "";
+    if (val instanceof Date) {
+      const adjustedDate = new Date(val.getTime() + (12 * 60 * 60 * 1000));
+      return adjustedDate.toISOString().substring(0, 10);
+    }
+    if (typeof val === 'number') {
+      let serial = val;
+      if (serial > 60) serial -= 1;
+      const date = new Date((serial - 25568) * 86400 * 1000);
+      const adjustedDate = new Date(date.getTime() + (12 * 60 * 60 * 1000));
+      return adjustedDate.toISOString().substring(0, 10);
+    }
+    if (typeof val === 'string') {
+      let cleaned = val.replace(/[^0-9]/g, '').trim();
+      if (cleaned.length === 8) {
+        return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
+      }
+      if (cleaned.length === 6) {
+        return `20${cleaned.substring(0, 2)}-${cleaned.substring(2, 4)}-${cleaned.substring(4, 6)}`;
+      }
+      const parts = val.split(/[\/\-\.]/);
+      if (parts.length === 3) {
+        let year = parts[0].trim();
+        let month = parts[1].trim().padStart(2, '0');
+        let day = parts[2].trim().padStart(2, '0');
+        if (year.length === 2) year = '20' + year;
+        if (year.length === 4 && month.length === 2 && day.length === 2) {
+          return `${year}-${month}-${day}`;
+        }
+      }
+      const match = val.replace(/[\/\.]/g, '-').trim();
+      if (match.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return match.substring(0, 10);
+      }
+    }
+    return String(val).trim();
+  };
+
+  // 엑셀 로우 객체에서 다양한 키 바리에이션을 허용하여 데이터를 가져오는 헬퍼
+  const getExcelRowValue = (row, possibleKeys) => {
+    const keys = Object.keys(row);
+    for (const key of keys) {
+      const cleanKey = key.replace(/\s+/g, '').toLowerCase();
+      for (const pk of possibleKeys) {
+        const cleanPk = pk.replace(/\s+/g, '').toLowerCase();
+        if (cleanKey === cleanPk || cleanKey.includes(cleanPk)) {
+          return row[key];
+        }
+      }
+    }
+    return null;
+  };
+
+  // 엑셀 품목을 장바구니로 로드
+  const loadItemsFromExcel = (force = false) => {
+    if (!uploadedExcelRows) return;
+    if (salesCart.length > 0 && !force) {
+      return;
+    }
+    if (salesCart.length > 0 && force) {
+      if (!window.confirm("현재 작성 중인 매출 카트 품목이 존재합니다. 엑셀의 품목으로 덮어쓰시겠습니까?")) {
+        return;
+      }
+    }
+
+    if (!salesDate || !selectedPartner) return;
+
+    const cleanPartnerName = selectedPartner.replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
+
+    const matchingRows = uploadedExcelRows.filter(row => {
+      const partnerKeys = ['학교', '거래처', '거래처명', '납품처', '바이어', '매출처', '수신', '상호명'];
+      const partnerVal = getExcelRowValue(row, partnerKeys) || "";
+      const cleanRowPartner = String(partnerVal).replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
+      if (!cleanRowPartner) return false;
+
+      const dateKeys = ['납품일자', '입고일', '납품기한', '일자', '날짜', '매출일자', '배송일'];
+      const dateVal = getExcelRowValue(row, dateKeys) || "";
+      const formattedRowDate = formatDateString(dateVal);
+
+      const partnerMatches = cleanRowPartner.includes(cleanPartnerName) || cleanPartnerName.includes(cleanRowPartner);
+      const dateMatches = formattedRowDate === salesDate;
+
+      return partnerMatches && dateMatches;
+    });
+
+    if (matchingRows.length === 0) {
+      setExcelStatusText(`엑셀 로드됨 (선택 일자/매출처의 매칭 데이터 없음)`);
+      setExcelStatusColor('var(--text-muted)');
+      return;
+    }
+
+    const tempCart = [];
+    matchingRows.forEach(row => {
+      const nameKeys = ['품목', '품목명', '상품명', '제품명', '상품', '품명'];
+      const rawProdName = sanitizeExcelUnitAndName(getExcelRowValue(row, nameKeys) || "");
+      if (!rawProdName || rawProdName.includes("합계") || rawProdName.includes("합 계")) return;
+
+      const qtyKeys = ['수량', '발주수량', '수량(ea)', 'ea', 'qty', '개수', '수량(box)', '박스'];
+      const qtyVal = getExcelRowValue(row, qtyKeys);
+      const qty = parseFloat(qtyVal) || 0;
+      if (qty <= 0) return;
+
+      const priceKeys = ['단가', '매출단가', '공급단가', '단가(원)', '가격', 'price'];
+      const priceVal = getExcelRowValue(row, priceKeys);
+      const price = parseInt(String(priceVal || "0").replace(/,/g, "")) || 0;
+
+      const unitKeys = ['규격/단위', '규격', '단위', '규격단위', 'unit'];
+      const unit = sanitizeExcelUnitAndName(String(getExcelRowValue(row, unitKeys) || "").trim());
+
+      const prodMeta = products.find(p => p.name.includes(rawProdName) || rawProdName.includes(p.name)) || {
+        id: null,
+        name: rawProdName,
+        unit: unit || "BOX",
+        origin: "국내산",
+        tax_type: '과세'
+      };
+
+      const finalPrice = price || prodMeta.sales_price || 0;
+      const amount = Math.floor(qty * finalPrice);
+      const isTaxable = prodMeta.tax_type !== '면세';
+      const tax = isTaxable ? Math.round(amount * 0.1) : 0;
+      const total = amount + tax;
+
+      tempCart.push({
+        product_id: prodMeta.id,
+        name: prodMeta.name,
+        unit: unit || prodMeta.unit || "BOX",
+        origin: prodMeta.origin || "국내산",
+        qty: qty,
+        price: finalPrice,
+        amount: amount,
+        tax: tax,
+        total: total,
+        isTaxApplied: isTaxable,
+        taxType: prodMeta.tax_type || '과세'
+      });
+    });
+
+    setSalesCart(tempCart);
+    setExcelStatusText(`엑셀에서 ${tempCart.length}건 품목 로드 완료`);
+    setExcelStatusColor('#34d399');
+  };
+
+  const handleExcelUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setExcelStatusText(`${file.name} 분석 중...`);
+    setExcelStatusColor('var(--text-muted)');
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        
+        if (rows.length === 0) {
+          alert("엑셀 시트 내 데이터 행이 존재하지 않습니다.");
+          setExcelStatusText("가져오기 실패");
+          setExcelStatusColor('var(--danger-color)');
+          return;
+        }
+
+        setUploadedExcelRows(rows);
+        setExcelStatusText(`엑셀 로드됨: ${file.name} (총 ${rows.length}행)`);
+        setExcelStatusColor('#34d399');
+        
+        alert("엑셀 파일이 성공적으로 로드되었습니다.\n매출일자와 매출처를 선택하시면 해당 데이터를 자동으로 불러옵니다.");
+      } catch (err) {
+        console.error(err);
+        setExcelStatusText("에러 발생");
+        setExcelStatusColor('var(--danger-color)');
+        alert("엑셀 파일 구조 분석 중 문제가 발생했습니다. 파일을 다시 한 번 확인해 주세요.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   useEffect(() => {
     fetchInvoices();
   }, [invoices]);
+
+  // 매출처, 발행일자, 또는 엑셀 로드 시 자동 매칭 적용
+  useEffect(() => {
+    if (uploadedExcelRows && selectedPartner && salesDate) {
+      loadItemsFromExcel(false);
+    }
+  }, [selectedPartner, salesDate, uploadedExcelRows]);
 
   const fetchInvoices = async () => {
     try {
@@ -466,6 +672,66 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
               required
             />
           </div>
+        </div>
+
+        {/* 엑셀 발주서 일괄 업로드 영역 */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.01)',
+          border: '1px dashed rgba(255, 255, 255, 0.15)',
+          borderRadius: '8px',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}>
+          <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary-color)', display: 'block' }}>
+            엑셀 발주서 일괄 업로드 (선택사항)
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleExcelUpload}
+              style={{ display: 'none' }}
+              id="sales-excel-input"
+            />
+            <button
+              type="button"
+              className="btn"
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px'
+              }}
+              onClick={() => document.getElementById('sales-excel-input').click()}
+            >
+              엑셀 파일 선택
+            </button>
+            <span style={{ fontSize: '0.75rem', color: excelStatusColor, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {excelStatusText || '업로드할 엑셀 파일(.xlsx)을 선택하세요.'}
+            </span>
+          </div>
+          {uploadedExcelRows && (
+            <button
+              type="button"
+              className="btn"
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                background: 'rgba(167, 139, 250, 0.15)',
+                color: 'var(--primary-color)',
+                border: '1px solid rgba(167, 139, 250, 0.35)',
+                borderRadius: '6px',
+                marginTop: '4px'
+              }}
+              onClick={() => loadItemsFromExcel(true)}
+            >
+              엑셀 매칭 품목 강제 로드
+            </button>
+          )}
         </div>
 
         {/* 품목 입력 영역 */}
