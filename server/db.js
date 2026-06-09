@@ -41,6 +41,9 @@ function query(sql, params = []) {
     return pgPool.query(pgSql, params).then(res => res.rows);
   } else {
     return new Promise((resolve, reject) => {
+      if (!sqliteDb) {
+        return reject(new Error("SQLite 데이터베이스 드라이버가 준비되지 않았습니다."));
+      }
       sqliteDb.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
@@ -57,6 +60,9 @@ function execute(sql, params = []) {
     return pgPool.query(pgSql, params).then(res => res.rowCount);
   } else {
     return new Promise((resolve, reject) => {
+      if (!sqliteDb) {
+        return reject(new Error("SQLite 데이터베이스 드라이버가 준비되지 않았습니다."));
+      }
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.changes);
@@ -74,6 +80,9 @@ async function executeInsert(sql, params = [], idColumnName = 'id') {
     return res.rows[0][idColumnName];
   } else {
     return new Promise((resolve, reject) => {
+      if (!sqliteDb) {
+        return reject(new Error("SQLite 데이터베이스 드라이버가 준비되지 않았습니다."));
+      }
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.lastID);
@@ -106,6 +115,12 @@ async function initDb() {
   }
 
   const isPg = dbType === 'postgres';
+  
+  if (!isPg && !sqlite3) {
+    console.warn("데이터베이스 드라이버 및 백엔드 스토리지 오류: SQLite 모드로 기동되었으나 sqlite3 드라이버가 존재하지 않습니다. 테이블 생성을 건너뜁니다.");
+    return;
+  }
+
   const pkType = isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
   const textType = isPg ? 'TEXT' : 'TEXT';
   const numericType = isPg ? 'NUMERIC' : 'NUMERIC';
