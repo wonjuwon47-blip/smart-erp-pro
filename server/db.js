@@ -1,11 +1,11 @@
 const { Pool } = require('pg');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
 let dbType = 'sqlite';
 let pgPool = null;
 let sqliteDb = null;
+let sqlite3 = null;
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
 // (대시보드 조작이 번거로우실 경우를 대비해 사용자의 PostgreSQL 주소를 직접 바인딩합니다.)
@@ -30,6 +30,9 @@ function fallbackToSqlite(err) {
     console.warn("PostgreSQL 연결 실패. SQLite로 폴백합니다. 에러:", err.message || err);
   }
   dbType = 'sqlite';
+  if (!sqlite3) {
+    sqlite3 = require('sqlite3').verbose();
+  }
   const dbPath = path.resolve(__dirname, '../db.sqlite');
   sqliteDb = new sqlite3.Database(dbPath);
   console.log("SQLite 데이터베이스가 연결되었습니다: " + dbPath);
