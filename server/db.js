@@ -1,5 +1,4 @@
 const { Pool } = require('pg');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
@@ -7,14 +6,25 @@ let dbType = 'sqlite';
 let pgPool = null;
 let sqliteDb = null;
 
+// sqlite3 모듈 lazy-load
+let sqlite3 = null;
+try {
+  sqlite3 = require('sqlite3').verbose();
+} catch (e) {
+  console.warn("sqlite3 모듈을 로드할 수 없습니다. PostgreSQL 모드만 사용 가능합니다.");
+}
+
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
-// (대시보드 조작이 번거로우실 경우를 대비해 사용자의 PostgreSQL 주소를 직접 바인딩합니다.)
 const connectionString = process.env.DATABASE_URL || "postgresql://smart_erp_db_2o7b_user:OZRggEHCo0AECVqpgzNwGA3Nzx992jTn@dpg-d8j4sjmq1p3s73fbgrjg-a/smart_erp_db_2o7b";
 
 // 디폴트로 SQLite 데이터베이스 준비
 const dbPath = path.resolve(__dirname, '../db.sqlite');
-sqliteDb = new sqlite3.Database(dbPath);
-console.log("로컬 SQLite 백업 드라이버가 준비되었습니다: " + dbPath);
+if (sqlite3) {
+  sqliteDb = new sqlite3.Database(dbPath);
+  console.log("로컬 SQLite 백업 드라이버가 준비되었습니다: " + dbPath);
+} else {
+  console.log("SQLite 드라이버가 준비되지 않아 SQLite 백업이 비활성화되었습니다.");
+}
 
 if (connectionString) {
   pgPool = new Pool({
