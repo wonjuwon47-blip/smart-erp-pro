@@ -151,10 +151,6 @@ export const hqApi = {
   delete: async (id) => {
     const res = await apiClient.delete(`/api/erp/headquarters/${id}`);
     return res.data;
-  },
-  setActive: async (id) => {
-    const res = await apiClient.post(`/api/erp/headquarters/${id}/active`);
-    return res.data;
   }
 };
 
@@ -211,43 +207,39 @@ export const estimateApi = {
   }
 };
 
-export const receivableApi = {
+export const receivablesApi = {
   getAll: async () => {
-    const res = await apiClient.get('/api/erp/receivables');
+    const res = await apiClient.get('/api/erp/receivables-payments');
     return res.data;
   },
-  payReceive: async (data) => {
-    const res = await apiClient.post('/api/erp/receivables/pay-receive', data);
-    return res.data;
-  },
-  adjust: async (data) => {
-    const res = await apiClient.post('/api/erp/receivables/adjust', data);
+  update: async (data) => {
+    const res = await apiClient.post('/api/erp/receivables-payments', data);
     return res.data;
   }
 };
 
-export const erpSettingsApi = {
+export const settingsApi = {
   get: async () => {
     const res = await apiClient.get('/api/erp/settings');
     return res.data;
   },
-  update: async (data) => {
-    const res = await apiClient.put('/api/erp/settings', data);
+  save: async (data) => {
+    const res = await apiClient.post('/api/erp/settings', data);
     return res.data;
   }
 };
 
-export const systemApi = {
-  exportData: async () => {
-    const res = await apiClient.get('/api/erp/data-export');
+export const backupApi = {
+  export: async () => {
+    const res = await apiClient.get('/api/erp/backup/export');
     return res.data;
   },
-  resetData: async () => {
-    const res = await apiClient.post('/api/erp/data-reset');
+  import: async (data) => {
+    const res = await apiClient.post('/api/erp/backup/import', data);
     return res.data;
   },
-  importData: async (data) => {
-    const res = await apiClient.post('/api/erp/data-import', data);
+  reset: async () => {
+    const res = await apiClient.post('/api/erp/backup/reset');
     return res.data;
   }
 };

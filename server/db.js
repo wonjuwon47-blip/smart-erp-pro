@@ -1,49 +1,27 @@
 const { Pool } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
 let dbType = 'sqlite';
 let pgPool = null;
 let sqliteDb = null;
-let sqlite3 = null;
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
 // (대시보드 조작이 번거로우실 경우를 대비해 사용자의 PostgreSQL 주소를 직접 바인딩합니다.)
 const connectionString = process.env.DATABASE_URL || "postgresql://smart_erp_db_2o7b_user:OZRggEHCo0AECVqpgzNwGA3Nzx992jTn@dpg-d8j4sjmq1p3s73fbgrjg-a/smart_erp_db_2o7b";
 
-function connectDatabase() {
-  if (connectionString) {
-    dbType = 'postgres';
-    pgPool = new Pool({
-      connectionString: connectionString,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 2000 // 2초 이내 연결 안 되면 실패로 간주
-    });
-    console.log("PostgreSQL 데이터베이스 연결을 준비합니다.");
-  } else {
-    fallbackToSqlite();
-  }
-}
+// 디폴트로 SQLite 데이터베이스 준비
+const dbPath = path.resolve(__dirname, '../db.sqlite');
+sqliteDb = new sqlite3.Database(dbPath);
+console.log("로컬 SQLite 백업 드라이버가 준비되었습니다: " + dbPath);
 
-function fallbackToSqlite(err) {
-  if (err) {
-    console.warn("PostgreSQL 연결 실패. SQLite로 폴백합니다. 에러:", err.message || err);
-  }
-  dbType = 'sqlite';
-  try {
-    if (!sqlite3) {
-      sqlite3 = require('sqlite3').verbose();
-    }
-    const dbPath = path.resolve(__dirname, '../db.sqlite');
-    sqliteDb = new sqlite3.Database(dbPath);
-    console.log("SQLite 데이터베이스가 연결되었습니다: " + dbPath);
-  } catch (e) {
-    console.error("SQLite3 모듈 로드 실패 (의존성 없음). Mock 데이터 모드로 전환하여 기동을 유지합니다. 에러:", e.message);
-    dbType = 'mock';
-  }
+if (connectionString) {
+  pgPool = new Pool({
+    connectionString: connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
 }
-
-connectDatabase();
 
 // 공용 쿼리 실행 헬퍼 (SELECT용)
 function query(sql, params = []) {
@@ -51,16 +29,13 @@ function query(sql, params = []) {
     let index = 1;
     const pgSql = sql.replace(/\?/g, () => `$${index++}`);
     return pgPool.query(pgSql, params).then(res => res.rows);
-  } else if (dbType === 'sqlite') {
+  } else {
     return new Promise((resolve, reject) => {
       sqliteDb.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
-  } else {
-    console.warn("Mock 모드 쿼리 실행:", sql);
-    return Promise.resolve([]);
   }
 }
 
@@ -70,16 +45,13 @@ function execute(sql, params = []) {
     let index = 1;
     const pgSql = sql.replace(/\?/g, () => `$${index++}`);
     return pgPool.query(pgSql, params).then(res => res.rowCount);
-  } else if (dbType === 'sqlite') {
+  } else {
     return new Promise((resolve, reject) => {
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.changes);
       });
     });
-  } else {
-    console.warn("Mock 모드 실행:", sql);
-    return Promise.resolve(0);
   }
 }
 
@@ -90,33 +62,37 @@ async function executeInsert(sql, params = [], idColumnName = 'id') {
     const pgSql = sql.replace(/\?/g, () => `$${index++}`) + ` RETURNING ${idColumnName}`;
     const res = await pgPool.query(pgSql, params);
     return res.rows[0][idColumnName];
-  } else if (dbType === 'sqlite') {
+  } else {
     return new Promise((resolve, reject) => {
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
     });
-  } else {
-    console.warn("Mock 모드 삽입:", sql);
-    return Promise.resolve(1);
   }
 }
 
 // 테이블 자동 생성 (DDL 초기화)
 async function initDb() {
-  if (dbType === 'postgres') {
+  if (connectionString) {
     try {
-      await pgPool.query("SELECT 1");
-      console.log("PostgreSQL 데이터베이스가 활성화 상태입니다.");
-    } catch (err) {
-      fallbackToSqlite(err);
+      // 3초 연결 타임아웃 테스트를 통해 PostgreSQL 가용 여부 판별
+      const tempPool = new Pool({
+        connectionString: connectionString,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 3000
+      });
+      await tempPool.query('SELECT 1');
+      await tempPool.end();
+      dbType = 'postgres';
+      console.log("PostgreSQL 데이터베이스 연결을 검증하여 활성화했습니다.");
+    } catch (e) {
+      dbType = 'sqlite';
+      console.warn("PostgreSQL 연결 검증 실패 (로컬 개발 환경으로 감지). SQLite 모드로 하이브리드 전환합니다. 사유: " + e.message);
     }
-  }
-
-  if (dbType === 'mock') {
-    console.warn("Mock 데이터베이스 상태이므로 스키마 초기화를 생략합니다.");
-    return;
+  } else {
+    dbType = 'sqlite';
+    console.log("데이터베이스 환경변수 미감지. SQLite로 자동 기동합니다.");
   }
 
   const isPg = dbType === 'postgres';
@@ -214,24 +190,23 @@ async function initDb() {
       )
     `);
 
-    // 7. 본사 정보 테이블
+    // 7. 본사(사업소) 테이블
     await execute(`
       CREATE TABLE IF NOT EXISTS headquarters (
         id ${pkType},
         company_id INTEGER NOT NULL,
         name VARCHAR(100) NOT NULL,
-        reg_no VARCHAR(50) NOT NULL,
-        owner VARCHAR(50) NOT NULL,
+        reg_no VARCHAR(50),
+        owner VARCHAR(50),
         address ${textType},
         phone VARCHAR(50),
         business VARCHAR(100),
         stamp ${textType},
-        is_active BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // 8. 사원 정보 테이블
+    // 8. 사원 테이블
     await execute(`
       CREATE TABLE IF NOT EXISTS employees (
         id ${pkType},
@@ -252,28 +227,27 @@ async function initDb() {
         company_id INTEGER NOT NULL,
         name VARCHAR(100) NOT NULL,
         acc_no VARCHAR(100) NOT NULL,
-        owner VARCHAR(50),
+        owner VARCHAR(100),
         balance INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // 10. 견적서 테이블
+    // 10. 견적서 마스터 테이블
     await execute(`
       CREATE TABLE IF NOT EXISTS estimates (
-        id ${pkType},
+        id VARCHAR(50) PRIMARY KEY,
         company_id INTEGER NOT NULL,
-        serial_no VARCHAR(50) NOT NULL,
         date VARCHAR(20) NOT NULL,
         receiver VARCHAR(100) NOT NULL,
         ref VARCHAR(100),
         receiver_phone VARCHAR(50),
         supplier_name VARCHAR(100),
-        supplier_biz_no VARCHAR(50),
+        supplier_bizno VARCHAR(50),
         supplier_owner VARCHAR(50),
         supplier_address ${textType},
-        supplier_biz_type VARCHAR(100),
-        supplier_biz_item VARCHAR(100),
+        supplier_biztype VARCHAR(100),
+        supplier_bizitem VARCHAR(100),
         supplier_manager VARCHAR(50),
         supplier_phone VARCHAR(50),
         total_amount INTEGER DEFAULT 0,
@@ -287,10 +261,10 @@ async function initDb() {
     await execute(`
       CREATE TABLE IF NOT EXISTS estimate_items (
         id ${pkType},
-        estimate_id INTEGER NOT NULL,
+        estimate_id VARCHAR(50) NOT NULL,
         name VARCHAR(100) NOT NULL,
-        unit VARCHAR(50),
-        type VARCHAR(50),
+        unit VARCHAR(20) DEFAULT 'EA',
+        type VARCHAR(20),
         qty ${numericType} DEFAULT 1,
         price INTEGER DEFAULT 0,
         amount INTEGER DEFAULT 0,
@@ -300,23 +274,24 @@ async function initDb() {
       )
     `);
 
-    // 12. 외상/미수금 보정 테이블
+    // 12. 외상 수금/지급 누계액 관리 테이블
     await execute(`
       CREATE TABLE IF NOT EXISTS receivables_payments (
         id ${pkType},
         company_id INTEGER NOT NULL,
         partner_name VARCHAR(100) NOT NULL,
-        total_sales_adjust INTEGER,
-        total_purchases_adjust INTEGER,
         recovered INTEGER DEFAULT 0,
         paid INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        total_sales INTEGER DEFAULT NULL,
+        total_purchases INTEGER DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_company_partner UNIQUE(company_id, partner_name)
       )
     `);
 
-    // 13. ERP 설정 테이블
+    // 13. 전역 인쇄 및 시스템 설정 테이블
     await execute(`
-      CREATE TABLE IF NOT EXISTS erp_settings (
+      CREATE TABLE IF NOT EXISTS settings (
         company_id INTEGER PRIMARY KEY,
         paper_size VARCHAR(20) DEFAULT 'A4',
         margin_top INTEGER DEFAULT 15,
@@ -328,7 +303,7 @@ async function initDb() {
         hk_f7 VARCHAR(50) DEFAULT 'purchase',
         hk_f8 VARCHAR(50) DEFAULT 'receivables',
         hk_f9 VARCHAR(50) DEFAULT 'excel-import',
-        print_seal_image ${textType} DEFAULT ''
+        active_hq_id INTEGER DEFAULT NULL
       )
     `);
 

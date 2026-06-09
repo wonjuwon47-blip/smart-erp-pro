@@ -4,3 +4,10 @@ node_modules/
 db.sqlite
 .gemini/
 *.log
+
+# 임시 백업 및 스크래치 파일
+index_backup_*
+index_vanilla*
+part*.html
+restore_index*
+scratch/
