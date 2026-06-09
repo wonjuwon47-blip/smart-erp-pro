@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoiceApi, partnerApi } from '../services/api';
-import { Plus, Trash2, Printer, Search, Save, X } from 'lucide-react';
+import { Plus, Trash2, Printer, Search, Save, X, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function SalesManagement({ products, partners, invoices, onDataChange }) {
@@ -24,6 +24,24 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
   // 전표 상세 조회용 상태
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // 전표 수정 모드 상태
+  const [editInvoiceId, setEditInvoiceId] = useState(null);
+
+  // 라벨 프린트 토글 상태
+  const [labelPrintToggle, setLabelPrintToggle] = useState('off');
+
+  // 빠른 품목 검색 모달 상태
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredProductList, setFilteredProductList] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // 전표 목록 검색 필터 상태
+  const [filterPartner, setFilterPartner] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   const formatNumber = (num) => {
     return new Intl.NumberFormat('ko-KR').format(num || 0);
@@ -275,6 +293,10 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
     }
 
     const amount = Math.floor(qty * price);
+    const isTaxable = prod.tax_type !== '면세';
+    const tax = isTaxable ? Math.round(amount * 0.1) : 0;
+    const total = amount + tax;
+
     const newCartItem = {
       product_id: prod.id,
       name: prod.name,
@@ -283,9 +305,9 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
       qty: parseFloat(qty) || 1,
       price: parseInt(price, 10) || 0,
       amount: amount,
-      tax: 0,
-      total: amount,
-      isTaxApplied: false,
+      tax: tax,
+      total: total,
+      isTaxApplied: isTaxable,
       taxType: prod.tax_type // '과세' / '면세'
     };
 
@@ -299,11 +321,7 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
   const handleToggleItemTax = (index) => {
     const updated = [...salesCart];
     const item = updated[index];
-
-    if (item.taxType === '면세') {
-      alert("해당 상품은 면세 품목이므로 부가세를 적용할 수 없습니다.");
-      return;
-    }
+    if (item.taxType === '면세') return; // 면세는 강제 무과세
 
     item.isTaxApplied = !item.isTaxApplied;
     item.tax = item.isTaxApplied ? Math.round(item.amount * 0.1) : 0;
@@ -311,7 +329,7 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
     setSalesCart(updated);
   };
 
-  // 카트 수량/단가 변경
+  // 카트 수량 및 단가 등 세부 수정 핸들러
   const handleCartItemChange = (index, field, value) => {
     const updated = [...salesCart];
     const item = updated[index];
@@ -329,11 +347,10 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
   };
 
   const handleRemoveCartItem = (index) => {
-    const updated = salesCart.filter((_, i) => i !== index);
-    setSalesCart(updated);
+    setSalesCart(salesCart.filter((_, i) => i !== index));
   };
 
-  // 카트 총합 계산
+  // 장바구니 합계 구하기
   const getCartTotals = () => {
     let amount = 0;
     let tax = 0;
@@ -348,14 +365,14 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
 
   const totals = getCartTotals();
 
-  // 전표 최종 제출 저장
-  const handleSaveInvoice = async () => {
+  // 전표 등록/수정 저장 프로세스 (shouldPrint를 통해 인쇄 실행 여부 판단)
+  const handleSaveInvoice = async (shouldPrint = false) => {
     if (!selectedPartner) {
-      alert("거래처를 선택해 주세요.");
+      alert("매출처를 선택해 주세요.");
       return;
     }
     if (salesCart.length === 0) {
-      alert("매출 카트에 등록된 품목이 없습니다.");
+      alert("매출 카트가 비어 있습니다. 품목을 먼저 등록하세요.");
       return;
     }
 
@@ -367,23 +384,61 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
       totalTax: totals.tax,
       totalSum: totals.total,
       status: status,
-      items: salesCart
+      items: salesCart.map(item => ({
+        name: item.name,
+        unit: item.unit,
+        origin: item.origin,
+        qty: item.qty,
+        price: item.price,
+        amount: item.amount,
+        tax: item.tax,
+        total: item.total,
+        isTaxApplied: item.isTaxApplied
+      }))
     };
 
     try {
-      await invoiceApi.create(payload);
-      alert("매출 전표가 등록되었으며, 재고가 자동차감 처리되었습니다!");
+      let savedInvoice = null;
+      if (editInvoiceId) {
+        // 전표 수정 업데이트
+        const res = await invoiceApi.update(editInvoiceId, payload);
+        alert(`매출 전표가 정상적으로 수정되었습니다. [전표번호: INV-${editInvoiceId}]`);
+        savedInvoice = { ...payload, id: editInvoiceId };
+        setEditInvoiceId(null);
+      } else {
+        // 신규 전표 등록
+        const res = await invoiceApi.create(payload);
+        alert("신규 매출 전표가 저장되었습니다.");
+        savedInvoice = res;
+      }
+
+      // 장바구니 비우기 및 정보 동기화
       setSalesCart([]);
       setSelectedPartner('');
-      setStatus('청구(외상)');
-      onDataChange();
+      
+      if (onDataChange) onDataChange();
       fetchInvoices();
+
+      // 인쇄 조건 만족 시 수행
+      if (shouldPrint && savedInvoice) {
+        triggerInvoicePrintDoc(savedInvoice);
+        
+        // 상품 라벨 토글 ON인 경우 추가 출력 여부 알림
+        if (labelPrintToggle === 'on') {
+          setTimeout(() => {
+            if (confirm("매출거래명세서 출력이 완료되었습니다.\n이어서 회사 규격 라벨 스티커(60mm x 60mm)를 추가로 출력하시겠습니까?")) {
+              triggerLabelPrintDoc(savedInvoice);
+            }
+          }, 1000);
+        }
+      }
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "전표 저장 중 오류가 발생했습니다.");
     }
   };
 
+  // 전표 상세 조회
   const handleInvoiceClick = async (id) => {
     try {
       const detail = await invoiceApi.getById(id);
@@ -395,6 +450,60 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
     }
   };
 
+  // 전표 수정 모드로 전입
+  const handleEditInvoice = async (id, e) => {
+    e.stopPropagation();
+    try {
+      const detail = await invoiceApi.getById(id);
+      setEditInvoiceId(detail.id);
+      setSelectedPartner(detail.partner_name);
+      setSalesDate(detail.date);
+      setStatus(detail.status);
+
+      // 상세 품목을 카트 형식으로 로드
+      const cartItems = (detail.items || []).map(item => {
+        const prodMeta = products.find(p => p.name === item.name) || {
+          id: null,
+          name: item.name,
+          unit: item.unit || 'EA',
+          origin: item.origin || '국내산',
+          tax_type: item.is_tax_applied ? '과세' : '면세'
+        };
+
+        return {
+          product_id: item.product_id || prodMeta.id,
+          name: item.name,
+          unit: item.unit || prodMeta.unit || 'EA',
+          origin: item.origin || prodMeta.origin || '국내산',
+          qty: parseFloat(item.qty) || 1,
+          price: parseInt(item.price, 10) || 0,
+          amount: item.amount || Math.floor(item.qty * item.price),
+          tax: item.tax || 0,
+          total: item.total || 0,
+          isTaxApplied: !!item.is_tax_applied,
+          taxType: prodMeta.tax_type
+        };
+      });
+
+      setSalesCart(cartItems);
+      alert(`[수정 모드 활성화] INV-${detail.id} 전표가 카트에 로드되었습니다. 수정 후 저장 버튼을 클릭하세요.`);
+    } catch (err) {
+      console.error(err);
+      alert("수정할 전표 정보를 불러오지 못했습니다.");
+    }
+  };
+
+  // 수정 취소
+  const handleCancelEdit = () => {
+    setEditInvoiceId(null);
+    setSalesCart([]);
+    setSelectedPartner('');
+    setStatus('청구(외상)');
+    setSalesDate(new Date().toISOString().substring(0, 10));
+    alert("수정 모드가 취소되었습니다.");
+  };
+
+  // 전표 삭제
   const handleDeleteInvoice = async (id, e) => {
     e.stopPropagation();
     if (!confirm("전표를 삭제하시겠습니까? 매출된 품목의 재고가 다시 자동 롤백됩니다.")) return;
@@ -402,11 +511,142 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
     try {
       await invoiceApi.delete(id);
       alert("삭제되었습니다.");
+      if (editInvoiceId === id) {
+        setEditInvoiceId(null);
+        setSalesCart([]);
+      }
       onDataChange();
       fetchInvoices();
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "전표 삭제 중 에러가 발생했습니다.");
+    }
+  };
+
+  // ==========================================
+  // 돋보기 품목 고속 키보드 검색 모달 핸들링
+  // ==========================================
+  const openSearchModal = () => {
+    setSearchQuery('');
+    setFilteredProductList(products);
+    setSelectedIndex(0);
+    setShowSearchModal(true);
+  };
+
+  const handleSearchInputChange = (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    setSearchQuery(e.target.value);
+    const filtered = products.filter(p => 
+      p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+    );
+    setFilteredProductList(filtered);
+    setSelectedIndex(0);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (filteredProductList.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((selectedIndex + 1) % filteredProductList.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((selectedIndex - 1 + filteredProductList.length) % filteredProductList.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      selectProductFromModal(filteredProductList[selectedIndex]);
+    }
+  };
+
+  const selectProductFromModal = (prod) => {
+    setSelectedProduct(prod.id);
+    setPrice(prod.sales_price || 0);
+    setShowSearchModal(false);
+  };
+
+  // ==========================================
+  // 60mm x 60mm 상품 라벨 스티커 인쇄 모듈
+  // ==========================================
+  const triggerLabelPrintDoc = (sale) => {
+    let hqName = "본사 사업소";
+    const savedHq = localStorage.getItem('smart_erp_hq_info');
+    if (savedHq) {
+      try { hqName = JSON.parse(savedHq).hqName || "본사 사업소"; } catch(e) {}
+    }
+    let supplierCore = hqName.replace(/\(주\)/g, "").split(" ")[0].trim();
+    if (supplierCore.length > 5) supplierCore = supplierCore.substring(0, 5);
+
+    let partnerCore = sale.partner_name || sale.partner || "";
+    partnerCore = partnerCore.replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
+    if (partnerCore.length > 8) partnerCore = partnerCore.substring(0, 8);
+
+    let labelHtml = "";
+    const items = sale.items || [];
+    
+    items.forEach(item => {
+      let itemNameCore = item.name.split("(")[0].trim().replace("경북 부사 ", "").replace("칠레산 ", "").replace("냉동 ", "");
+      if (itemNameCore.length > 5) itemNameCore = itemNameCore.substring(0, 5);
+      
+      let itemOrigin = (item.origin || "국내산").split("(")[0].trim();
+      if (itemOrigin.length > 3) itemOrigin = itemOrigin.substring(0, 3);
+
+      const dateStr = sale.date.replace(/-/g, ".");
+
+      let weightVal = "1";
+      let weightUnit = "EA";
+      const nameMatch = item.name.match(/(\d+)\s*(kg|g|t|EA|BOX|L|ml)/i);
+      const originMatch = itemOrigin.match(/(\d+)\s*(kg|g|t|EA|BOX|L|ml)/i);
+      if (nameMatch) {
+        weightVal = nameMatch[1];
+        weightUnit = nameMatch[2].toLowerCase();
+      } else if (originMatch) {
+        weightVal = originMatch[1];
+        weightUnit = originMatch[2].toLowerCase();
+      } else if (item.unit) {
+        weightVal = item.qty;
+        weightUnit = item.unit.toLowerCase();
+      }
+
+      labelHtml += `
+        <div class="print-label-box" style="width: 60mm; height: 60mm; page-break-after: always; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
+          <!-- Row 1: 공급처 -->
+          <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
+            <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
+            <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900; letter-spacing: 1px;">${partnerCore}</div>
+          </div>
+          <!-- Row 2: 품종 -->
+          <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
+            <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">품종</div>
+            <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900;">${itemNameCore}</div>
+            <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1; background: #fafafa;">산지</div>
+            <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 18pt; font-weight: 900;">${itemOrigin}</div>
+          </div>
+          <!-- Row 3: 무게 -->
+          <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
+            <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">무게</div>
+            <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: bold;">
+              <span style="font-size: 28pt; font-weight: 900; margin-right: 4px; font-family: 'Inter', sans-serif;">${weightVal}</span> ${weightUnit}
+            </div>
+            <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1.1; background: #fafafa;">공급자</div>
+            <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 10.5pt; font-weight: 900; text-align: center; line-height: 1.2;">${supplierCore}</div>
+          </div>
+          <!-- Row 4: 포장일 -->
+          <div style="display: flex; height: 25%;">
+            <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; background: #fafafa;">포장일</div>
+            <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 23pt; font-weight: 900; font-family: monospace; letter-spacing: 1.5px;">${dateStr}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    const printArea = document.getElementById("print-document-area");
+    if (printArea) {
+      printArea.innerHTML = labelHtml;
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    } else {
+      alert("인쇄 컨테이너를 찾을 수 없습니다.");
     }
   };
 
@@ -555,7 +795,7 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
                     <td style="border: 1px solid #000; padding: 2px; text-align: right; font-family: monospace;">${formatNumber(item.price)}</td>
                     <td style="border: 1px solid #000; padding: 2px; text-align: right; font-family: monospace; font-weight: bold;">${formatNumber(item.amount)}</td>
                     <td style="border: 1px solid #000; padding: 2px; text-align: right; font-family: monospace;">${formatNumber(item.tax)}</td>
-                    <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 0.65rem; font-weight: bold; color: green;">${item.is_tax_applied ? '과' : '면'}</td>
+                    <td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 0.65rem; font-weight: bold; color: green;">${item.is_tax_applied || item.isTaxApplied ? '과' : '면'}</td>
                   </tr>
                 `;
               }).join("")}
@@ -627,6 +867,15 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
 
   const filteredPartners = partners.filter(p => p.type === '매출처' || p.type === '혼합');
 
+  // 검색 필터링된 전표 목록 계산
+  const filteredInvoices = invoiceList.filter(inv => {
+    if (filterPartner && inv.partner_name !== filterPartner) return false;
+    if (filterStartDate && inv.date < filterStartDate) return false;
+    if (filterEndDate && inv.date > filterEndDate) return false;
+    if (filterStatus && inv.status !== filterStatus) return false;
+    return true;
+  });
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '20px', textAlign: 'left' }} className="responsive-split">
       {/* 좌측: 매출 거래 입력 카트 (글래스모피즘) */}
@@ -641,11 +890,25 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
         gap: '20px',
         alignSelf: 'start'
       }}>
-        <div>
-          <h3 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1.15rem' }}>매출 거래 작성 카트</h3>
-          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            납품처 거래를 전표로 등록하고 발행합니다.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1.15rem' }}>
+              {editInvoiceId ? `매출 전표 수정 카트 [수정중: INV-${editInvoiceId}]` : '매출 거래 작성 카트'}
+            </h3>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              납품처 거래를 전표로 등록하고 발행합니다.
+            </p>
+          </div>
+          {editInvoiceId && (
+            <button
+              type="button"
+              className="btn btn-danger"
+              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+              onClick={handleCancelEdit}
+            >
+              수정 취소
+            </button>
+          )}
         </div>
 
         {/* 거래처 및 날짜 설정 */}
@@ -746,14 +1009,30 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
         }}>
           <div className="form-group">
             <label>매출 상품 선택</label>
-            <select value={selectedProduct} onChange={handleProductChange}>
-              <option value="">-- 상품 검색/선택 --</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name} (재고: {p.stock} {p.unit} | 단가: {formatNumber(p.sales_price)}원)
-                </option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select value={selectedProduct} onChange={handleProductChange} style={{ flex: 1 }}>
+                <option value="">-- 상품 검색/선택 --</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} (재고: {p.stock} {p.unit} | 단가: {formatNumber(p.sales_price)}원)
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  background: 'rgba(167, 139, 250, 0.12)',
+                  color: 'var(--primary-color)',
+                  border: '1px solid rgba(167, 139, 250, 0.3)',
+                  padding: '8px'
+                }}
+                onClick={openSearchModal}
+                title="상품 초고속 검색"
+              >
+                <Search size={16} />
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -889,27 +1168,79 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
             <span style={{ color: 'var(--text-muted)' }}>세액 (부가세)</span>
             <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{formatNumber(totals.tax)}원</span>
           </div>
-          <div style={{ display: 'flex', justifyContext: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', fontSize: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', fontSize: '1rem' }}>
             <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>총인수액</span>
             <span style={{ fontFamily: 'monospace', fontWeight: '900', color: '#fff' }}>{formatNumber(totals.total)}원</span>
           </div>
         </div>
 
-        {/* 영수/청구 구분 및 발행 등록 단추 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: '8px 4px' }}>
-            <option value="청구(외상)">청구 (외상)</option>
-            <option value="영수(완납)">영수 (완납)</option>
-          </select>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            onClick={handleSaveInvoice}
+        {/* 상품 라벨 스티커 인쇄 ON/OFF 토글 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.8rem',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '8px',
+          padding: '10px 14px'
+        }}>
+          <span style={{ color: 'var(--text-muted)' }}>60mm x 60mm 상품 라벨 스티커 출력</span>
+          <select
+            value={labelPrintToggle}
+            onChange={(e) => setLabelPrintToggle(e.target.value)}
+            style={{ width: '80px', padding: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px' }}
           >
-            <Save size={16} />
-            매출 전표 발행 및 저장
-          </button>
+            <option value="off">OFF</option>
+            <option value="on">ON</option>
+          </select>
+        </div>
+
+        {/* 영수/청구 구분 및 발행 등록 단추 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: '8px 4px' }}>
+              <option value="청구(외상)">청구 (외상)</option>
+              <option value="영수(완납)">영수 (완납)</option>
+            </select>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '0.85rem'
+                }}
+                onClick={() => handleSaveInvoice(false)}
+              >
+                <Save size={14} />
+                저장 전용
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '0.85rem'
+                }}
+                onClick={() => handleSaveInvoice(true)}
+              >
+                <Printer size={14} />
+                저장 & 인쇄
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -924,13 +1255,73 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
         flexDirection: 'column',
         gap: '16px'
       }}>
-        <div>
-          <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem' }}>
-            매출 전표 원장 대장
-          </h3>
-          <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            과거 발행된 매출거래명세서를 조회하고 재출력(A5 Pagination 인쇄)을 수행합니다.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem' }}>
+              매출 전표 원장 대장
+            </h3>
+            <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              과거 발행된 매출거래명세서를 조회하고 재출력(A5 Pagination 인쇄)을 수행합니다.
+            </p>
+          </div>
+        </div>
+
+        {/* 검색 필터 바 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1.2fr 0.8fr',
+          gap: '10px',
+          background: 'rgba(255,255,255,0.01)',
+          border: '1px solid rgba(255,255,255,0.05)',
+          borderRadius: '8px',
+          padding: '12px',
+          fontSize: '0.8rem'
+        }} className="responsive-split">
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>거래처 검색</label>
+            <select value={filterPartner} onChange={(e) => setFilterPartner(e.target.value)} style={{ padding: '4px' }}>
+              <option value="">전체 거래처</option>
+              {filteredPartners.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>수금 상태</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: '4px' }}>
+              <option value="">전체 상태</option>
+              <option value="청구(외상)">청구 (외상)</option>
+              <option value="영수(완납)">영수 (완납)</option>
+            </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>조회 기간</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} style={{ padding: '2px', fontSize: '0.75rem' }} />
+              <span>~</span>
+              <input type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} style={{ padding: '2px', fontSize: '0.75rem' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                width: '100%',
+                padding: '6px 0',
+                fontSize: '0.75rem',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)'
+              }}
+              onClick={() => {
+                setFilterPartner('');
+                setFilterStatus('');
+                setFilterStartDate('');
+                setFilterEndDate('');
+              }}
+            >
+              필터 초기화
+            </button>
+          </div>
         </div>
 
         <div style={{ maxHeight: '520px', overflowY: 'auto' }}>
@@ -942,19 +1333,19 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
                 <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>총 공급가액</th>
                 <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>세액</th>
                 <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>합계금액</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>상태</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'center', width: '100px' }}>작업</th>
+                <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', width: '70px' }}>상태</th>
+                <th style={{ padding: '10px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'center', width: '140px' }}>작업</th>
               </tr>
             </thead>
             <tbody>
-              {invoiceList.length === 0 ? (
+              {filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    등록된 매출거래 명세표 정보가 존재하지 않습니다.
+                    조회 조건에 일치하는 매출 거래 표가 존재하지 않습니다.
                   </td>
                 </tr>
               ) : (
-                invoiceList.map(inv => (
+                filteredInvoices.map(inv => (
                   <tr
                     key={inv.id}
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', cursor: 'pointer' }}
@@ -977,29 +1368,44 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
                       </span>
                     </td>
                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           className="btn"
                           style={{
-                            padding: '4px 8px',
-                            fontSize: '0.75rem',
-                            background: 'rgba(167, 139, 250, 0.2)',
+                            padding: '4px 6px',
+                            fontSize: '0.72rem',
+                            background: 'rgba(167, 139, 250, 0.15)',
                             color: 'var(--primary-color)',
-                            border: '1px solid rgba(167,139,250,0.3)',
+                            border: '1px solid rgba(167,139,250,0.25)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px'
+                            gap: '2px'
                           }}
                           onClick={() => triggerInvoicePrintDoc(inv)}
                         >
-                          <Printer size={12} />
+                          <Printer size={11} />
                           출력
                         </button>
                         <button
                           type="button"
+                          className="btn btn-warning"
+                          style={{
+                            padding: '4px 6px',
+                            fontSize: '0.72rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}
+                          onClick={(e) => handleEditInvoice(inv.id, e)}
+                        >
+                          <Edit size={11} />
+                          수정
+                        </button>
+                        <button
+                          type="button"
                           className="btn btn-danger"
-                          style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                          style={{ padding: '4px 6px', fontSize: '0.72rem' }}
                           onClick={(e) => handleDeleteInvoice(inv.id, e)}
                         >
                           삭제
@@ -1073,7 +1479,7 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
                 <div style={{ color: 'var(--primary-color)' }}>합계: <strong>{formatNumber(selectedInvoiceDetail.total_sum)}원</strong></div>
               </div>
             </div>
-            <div className="modal-footer" style={{ display: 'flex', justifyContext: 'flex-end', gap: '8px' }}>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
                 type="button"
                 className="btn btn-primary"
@@ -1094,6 +1500,57 @@ export default function SalesManagement({ products, partners, invoices, onDataCh
               <button type="button" className="btn" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }} onClick={() => setShowDetailModal(false)}>
                 닫기
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 품목 빠른 키보드 검색 모달 */}
+      {showSearchModal && (
+        <div className="modal-overlay active" style={{ display: 'flex' }} onClick={() => setShowSearchModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '450px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>품목 키보드 고속 검색</h3>
+              <button type="button" className="modal-close-btn" onClick={() => setShowSearchModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'left' }}>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  placeholder="품목명 또는 코드 검색 (방향키 이동, Enter 선택)"
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  onKeyDown={handleSearchKeyDown}
+                  autoFocus
+                  style={{ width: '100%', padding: '10px', fontSize: '1rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px' }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {filteredProductList.length === 0 ? (
+                    <li style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)' }}>검색 결과가 없습니다.</li>
+                  ) : (
+                    filteredProductList.map((p, idx) => (
+                      <li
+                        key={p.id}
+                        onClick={() => selectProductFromModal(p)}
+                        style={{
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          background: idx === selectedIndex ? 'rgba(167, 139, 250, 0.25)' : 'transparent',
+                          borderBottom: '1px solid rgba(255,255,255,0.03)',
+                          color: idx === selectedIndex ? 'var(--primary-color)' : '#fff',
+                          fontWeight: idx === selectedIndex ? 'bold' : 'normal'
+                        }}
+                      >
+                        {p.name} ({p.unit} | 단가: {formatNumber(p.sales_price)}원)
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
         </div>

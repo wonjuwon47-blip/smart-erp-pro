@@ -11,19 +11,31 @@ let sqliteDb = null;
 // (대시보드 조작이 번거로우실 경우를 대비해 사용자의 PostgreSQL 주소를 직접 바인딩합니다.)
 const connectionString = process.env.DATABASE_URL || "postgresql://smart_erp_db_2o7b_user:OZRggEHCo0AECVqpgzNwGA3Nzx992jTn@dpg-d8j4sjmq1p3s73fbgrjg-a/smart_erp_db_2o7b";
 
-if (connectionString) {
-  dbType = 'postgres';
-  pgPool = new Pool({
-    connectionString: connectionString,
-    ssl: { rejectUnauthorized: false }
-  });
-  console.log("PostgreSQL 데이터베이스가 연결되었습니다.");
-} else {
+function connectDatabase() {
+  if (connectionString) {
+    dbType = 'postgres';
+    pgPool = new Pool({
+      connectionString: connectionString,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 2000 // 2초 이내 연결 안 되면 실패로 간주
+    });
+    console.log("PostgreSQL 데이터베이스 연결을 준비합니다.");
+  } else {
+    fallbackToSqlite();
+  }
+}
+
+function fallbackToSqlite(err) {
+  if (err) {
+    console.warn("PostgreSQL 연결 실패. SQLite로 폴백합니다. 에러:", err.message || err);
+  }
   dbType = 'sqlite';
   const dbPath = path.resolve(__dirname, '../db.sqlite');
   sqliteDb = new sqlite3.Database(dbPath);
   console.log("SQLite 데이터베이스가 연결되었습니다: " + dbPath);
 }
+
+connectDatabase();
 
 // 공용 쿼리 실행 헬퍼 (SELECT용)
 function query(sql, params = []) {
@@ -76,6 +88,15 @@ async function executeInsert(sql, params = [], idColumnName = 'id') {
 
 // 테이블 자동 생성 (DDL 초기화)
 async function initDb() {
+  if (dbType === 'postgres') {
+    try {
+      await pgPool.query("SELECT 1");
+      console.log("PostgreSQL 데이터베이스가 활성화 상태입니다.");
+    } catch (err) {
+      fallbackToSqlite(err);
+    }
+  }
+
   const isPg = dbType === 'postgres';
   const pkType = isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
   const textType = isPg ? 'TEXT' : 'TEXT';
@@ -168,6 +189,124 @@ async function initDb() {
         total INTEGER DEFAULT 0,
         is_tax_applied BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 7. 본사 정보 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS headquarters (
+        id ${pkType},
+        company_id INTEGER NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        reg_no VARCHAR(50) NOT NULL,
+        owner VARCHAR(50) NOT NULL,
+        address ${textType},
+        phone VARCHAR(50),
+        business VARCHAR(100),
+        stamp ${textType},
+        is_active BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 8. 사원 정보 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id ${pkType},
+        company_id INTEGER NOT NULL,
+        code VARCHAR(50) NOT NULL,
+        name VARCHAR(50) NOT NULL,
+        dept VARCHAR(50),
+        position VARCHAR(50),
+        phone VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 9. 금융 계좌 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS banks (
+        id ${pkType},
+        company_id INTEGER NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        acc_no VARCHAR(100) NOT NULL,
+        owner VARCHAR(50),
+        balance INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 10. 견적서 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS estimates (
+        id ${pkType},
+        company_id INTEGER NOT NULL,
+        serial_no VARCHAR(50) NOT NULL,
+        date VARCHAR(20) NOT NULL,
+        receiver VARCHAR(100) NOT NULL,
+        ref VARCHAR(100),
+        receiver_phone VARCHAR(50),
+        supplier_name VARCHAR(100),
+        supplier_biz_no VARCHAR(50),
+        supplier_owner VARCHAR(50),
+        supplier_address ${textType},
+        supplier_biz_type VARCHAR(100),
+        supplier_biz_item VARCHAR(100),
+        supplier_manager VARCHAR(50),
+        supplier_phone VARCHAR(50),
+        total_amount INTEGER DEFAULT 0,
+        total_tax INTEGER DEFAULT 0,
+        total_sum INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 11. 견적 상세 품목 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS estimate_items (
+        id ${pkType},
+        estimate_id INTEGER NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        unit VARCHAR(50),
+        type VARCHAR(50),
+        qty ${numericType} DEFAULT 1,
+        price INTEGER DEFAULT 0,
+        amount INTEGER DEFAULT 0,
+        tax INTEGER DEFAULT 0,
+        total INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 12. 외상/미수금 보정 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS receivables_payments (
+        id ${pkType},
+        company_id INTEGER NOT NULL,
+        partner_name VARCHAR(100) NOT NULL,
+        total_sales_adjust INTEGER,
+        total_purchases_adjust INTEGER,
+        recovered INTEGER DEFAULT 0,
+        paid INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 13. ERP 설정 테이블
+    await execute(`
+      CREATE TABLE IF NOT EXISTS erp_settings (
+        company_id INTEGER PRIMARY KEY,
+        paper_size VARCHAR(20) DEFAULT 'A4',
+        margin_top INTEGER DEFAULT 15,
+        margin_left INTEGER DEFAULT 15,
+        font_size INTEGER DEFAULT 10,
+        logo_text VARCHAR(100) DEFAULT '[공급자 보관용]',
+        hk_f2 VARCHAR(50) DEFAULT 'sales',
+        hk_f4 VARCHAR(50) DEFAULT 'save',
+        hk_f7 VARCHAR(50) DEFAULT 'purchase',
+        hk_f8 VARCHAR(50) DEFAULT 'receivables',
+        hk_f9 VARCHAR(50) DEFAULT 'excel-import',
+        print_seal_image ${textType} DEFAULT ''
       )
     `);
 

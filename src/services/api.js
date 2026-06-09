@@ -135,4 +135,121 @@ export const ocrApi = {
   }
 };
 
+export const hqApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/erp/headquarters');
+    return res.data;
+  },
+  create: async (data) => {
+    const res = await apiClient.post('/api/erp/headquarters', data);
+    return res.data;
+  },
+  update: async (id, data) => {
+    const res = await apiClient.put(`/api/erp/headquarters/${id}`, data);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await apiClient.delete(`/api/erp/headquarters/${id}`);
+    return res.data;
+  },
+  setActive: async (id) => {
+    const res = await apiClient.post(`/api/erp/headquarters/${id}/active`);
+    return res.data;
+  }
+};
+
+export const employeeApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/erp/employees');
+    return res.data;
+  },
+  create: async (data) => {
+    const res = await apiClient.post('/api/erp/employees', data);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await apiClient.delete(`/api/erp/employees/${id}`);
+    return res.data;
+  }
+};
+
+export const bankApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/erp/banks');
+    return res.data;
+  },
+  create: async (data) => {
+    const res = await apiClient.post('/api/erp/banks', data);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await apiClient.delete(`/api/erp/banks/${id}`);
+    return res.data;
+  }
+};
+
+export const estimateApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/erp/estimates');
+    return res.data;
+  },
+  getById: async (id) => {
+    const res = await apiClient.get(`/api/erp/estimates/${id}`);
+    return res.data;
+  },
+  create: async (data) => {
+    const res = await apiClient.post('/api/erp/estimates', data);
+    return res.data;
+  },
+  update: async (id, data) => {
+    const res = await apiClient.put(`/api/erp/estimates/${id}`, data);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await apiClient.delete(`/api/erp/estimates/${id}`);
+    return res.data;
+  }
+};
+
+export const receivableApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/erp/receivables');
+    return res.data;
+  },
+  payReceive: async (data) => {
+    const res = await apiClient.post('/api/erp/receivables/pay-receive', data);
+    return res.data;
+  },
+  adjust: async (data) => {
+    const res = await apiClient.post('/api/erp/receivables/adjust', data);
+    return res.data;
+  }
+};
+
+export const erpSettingsApi = {
+  get: async () => {
+    const res = await apiClient.get('/api/erp/settings');
+    return res.data;
+  },
+  update: async (data) => {
+    const res = await apiClient.put('/api/erp/settings', data);
+    return res.data;
+  }
+};
+
+export const systemApi = {
+  exportData: async () => {
+    const res = await apiClient.get('/api/erp/data-export');
+    return res.data;
+  },
+  resetData: async () => {
+    const res = await apiClient.post('/api/erp/data-reset');
+    return res.data;
+  },
+  importData: async (data) => {
+    const res = await apiClient.post('/api/erp/data-import', data);
+    return res.data;
+  }
+};
+
 export default apiClient;

@@ -5,9 +5,12 @@ import SalesManagement from './pages/SalesManagement';
 import PurchaseManagement from './pages/PurchaseManagement';
 import ProductManagement from './pages/ProductManagement';
 import PartnerManagement from './pages/PartnerManagement';
+import CompanyBaseManagement from './pages/CompanyBaseManagement';
+import EstimatesManagement from './pages/EstimatesManagement';
+import ReceivablesManagement from './pages/ReceivablesManagement';
 import Settings from './pages/Settings';
-import { authApi, productApi, partnerApi, invoiceApi } from './services/api';
-import { Shield, LayoutDashboard, ArrowUpRight, ArrowDownRight, Package, Users, Settings as SettingsIcon, LogOut, Loader2 } from 'lucide-react';
+import { authApi, productApi, partnerApi, invoiceApi, erpSettingsApi } from './services/api';
+import { Shield, LayoutDashboard, ArrowUpRight, ArrowDownRight, Package, Users, Settings as SettingsIcon, LogOut, Loader2, Building2, FileText, Coins } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -45,8 +48,41 @@ export default function App() {
     };
     window.addEventListener('auth-expired', handleAuthExpired);
 
+    // 3. 전역 단축키 감지 리스너 바인딩 (F2=sales, F7=purchase, F8=receivables, F9=설정 등)
+    const handleGlobalKeyDown = async (e) => {
+      // DB 설정에 지정된 단축키 설정을 가져와 탭 전환에 반영
+      let hkConfig = { f2: 'sales', f7: 'purchase', f8: 'receivables', f9: 'settings' };
+      try {
+        const savedSettings = await erpSettingsApi.get();
+        if (savedSettings) {
+          hkConfig = {
+            f2: savedSettings.hk_f2 || 'sales',
+            f7: savedSettings.hk_f7 || 'purchase',
+            f8: savedSettings.hk_f8 || 'receivables',
+            f9: savedSettings.hk_f9 === 'excel-import' ? 'sales' : 'settings'
+          };
+        }
+      } catch (err) {}
+
+      if (e.key === "F2") {
+        e.preventDefault();
+        setCurrentTab(hkConfig.f2);
+      } else if (e.key === "F7") {
+        e.preventDefault();
+        setCurrentTab(hkConfig.f7);
+      } else if (e.key === "F8") {
+        e.preventDefault();
+        setCurrentTab(hkConfig.f8);
+      } else if (e.key === "F9") {
+        e.preventDefault();
+        setCurrentTab(hkConfig.f9);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+
     return () => {
       window.removeEventListener('auth-expired', handleAuthExpired);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, []);
 
@@ -182,21 +218,21 @@ export default function App() {
           </button>
           
           <button
-            className={`nav-btn ${currentTab === 'sales' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('sales')}
-            style={navBtnStyle(currentTab === 'sales')}
+            className={`nav-btn ${currentTab === 'company-base' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('company-base')}
+            style={navBtnStyle(currentTab === 'company-base')}
           >
-            <ArrowUpRight size={16} />
-            매출 거래 관리
+            <Building2 size={16} />
+            회사/부서/은행 관리
           </button>
 
           <button
-            className={`nav-btn ${currentTab === 'purchase' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('purchase')}
-            style={navBtnStyle(currentTab === 'purchase')}
+            className={`nav-btn ${currentTab === 'partners' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('partners')}
+            style={navBtnStyle(currentTab === 'partners')}
           >
-            <ArrowDownRight size={16} />
-            매입 거래 관리
+            <Users size={16} />
+            기초 거래처 관리
           </button>
 
           <button
@@ -209,12 +245,39 @@ export default function App() {
           </button>
 
           <button
-            className={`nav-btn ${currentTab === 'partners' ? 'active' : ''}`}
-            onClick={() => setCurrentTab('partners')}
-            style={navBtnStyle(currentTab === 'partners')}
+            className={`nav-btn ${currentTab === 'purchase' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('purchase')}
+            style={navBtnStyle(currentTab === 'purchase')}
           >
-            <Users size={16} />
-            기초 거래처 관리
+            <ArrowDownRight size={16} />
+            매입 거래 관리
+          </button>
+
+          <button
+            className={`nav-btn ${currentTab === 'sales' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('sales')}
+            style={navBtnStyle(currentTab === 'sales')}
+          >
+            <ArrowUpRight size={16} />
+            매출 거래 관리
+          </button>
+
+          <button
+            className={`nav-btn ${currentTab === 'receivables' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('receivables')}
+            style={navBtnStyle(currentTab === 'receivables')}
+          >
+            <Coins size={16} />
+            외상대금/미수금 관리
+          </button>
+
+          <button
+            className={`nav-btn ${currentTab === 'estimates' ? 'active' : ''}`}
+            onClick={() => setCurrentTab('estimates')}
+            style={navBtnStyle(currentTab === 'estimates')}
+          >
+            <FileText size={16} />
+            견적서 관리
           </button>
 
           <button
@@ -307,17 +370,26 @@ export default function App() {
           {currentTab === 'dashboard' && (
             <Dashboard products={products} partners={partners} invoices={invoices} />
           )}
-          {currentTab === 'sales' && (
-            <SalesManagement products={products} partners={partners} invoices={invoices} onDataChange={fetchCommonData} />
+          {currentTab === 'company-base' && (
+            <CompanyBaseManagement onDataChange={fetchCommonData} />
           )}
-          {currentTab === 'purchase' && (
-            <PurchaseManagement products={products} partners={partners} invoices={invoices} onDataChange={fetchCommonData} />
+          {currentTab === 'partners' && (
+            <PartnerManagement partners={partners} onDataChange={fetchCommonData} />
           )}
           {currentTab === 'products' && (
             <ProductManagement products={products} onDataChange={fetchCommonData} />
           )}
-          {currentTab === 'partners' && (
-            <PartnerManagement partners={partners} onDataChange={fetchCommonData} />
+          {currentTab === 'purchase' && (
+            <PurchaseManagement products={products} partners={partners} invoices={invoices} onDataChange={fetchCommonData} />
+          )}
+          {currentTab === 'sales' && (
+            <SalesManagement products={products} partners={partners} invoices={invoices} onDataChange={fetchCommonData} />
+          )}
+          {currentTab === 'receivables' && (
+            <ReceivablesManagement />
+          )}
+          {currentTab === 'estimates' && (
+            <EstimatesManagement products={products} onDataChange={fetchCommonData} />
           )}
           {currentTab === 'settings' && (
             <Settings onDataChange={fetchCommonData} />
