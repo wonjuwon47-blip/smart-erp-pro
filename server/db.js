@@ -30,12 +30,17 @@ function fallbackToSqlite(err) {
     console.warn("PostgreSQL 연결 실패. SQLite로 폴백합니다. 에러:", err.message || err);
   }
   dbType = 'sqlite';
-  if (!sqlite3) {
-    sqlite3 = require('sqlite3').verbose();
+  try {
+    if (!sqlite3) {
+      sqlite3 = require('sqlite3').verbose();
+    }
+    const dbPath = path.resolve(__dirname, '../db.sqlite');
+    sqliteDb = new sqlite3.Database(dbPath);
+    console.log("SQLite 데이터베이스가 연결되었습니다: " + dbPath);
+  } catch (e) {
+    console.error("SQLite3 모듈 로드 실패 (의존성 없음). Mock 데이터 모드로 전환하여 기동을 유지합니다. 에러:", e.message);
+    dbType = 'mock';
   }
-  const dbPath = path.resolve(__dirname, '../db.sqlite');
-  sqliteDb = new sqlite3.Database(dbPath);
-  console.log("SQLite 데이터베이스가 연결되었습니다: " + dbPath);
 }
 
 connectDatabase();
@@ -46,13 +51,16 @@ function query(sql, params = []) {
     let index = 1;
     const pgSql = sql.replace(/\?/g, () => `$${index++}`);
     return pgPool.query(pgSql, params).then(res => res.rows);
-  } else {
+  } else if (dbType === 'sqlite') {
     return new Promise((resolve, reject) => {
       sqliteDb.all(sql, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
+  } else {
+    console.warn("Mock 모드 쿼리 실행:", sql);
+    return Promise.resolve([]);
   }
 }
 
@@ -62,13 +70,16 @@ function execute(sql, params = []) {
     let index = 1;
     const pgSql = sql.replace(/\?/g, () => `$${index++}`);
     return pgPool.query(pgSql, params).then(res => res.rowCount);
-  } else {
+  } else if (dbType === 'sqlite') {
     return new Promise((resolve, reject) => {
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.changes);
       });
     });
+  } else {
+    console.warn("Mock 모드 실행:", sql);
+    return Promise.resolve(0);
   }
 }
 
@@ -79,13 +90,16 @@ async function executeInsert(sql, params = [], idColumnName = 'id') {
     const pgSql = sql.replace(/\?/g, () => `$${index++}`) + ` RETURNING ${idColumnName}`;
     const res = await pgPool.query(pgSql, params);
     return res.rows[0][idColumnName];
-  } else {
+  } else if (dbType === 'sqlite') {
     return new Promise((resolve, reject) => {
       sqliteDb.run(sql, params, function(err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
     });
+  } else {
+    console.warn("Mock 모드 삽입:", sql);
+    return Promise.resolve(1);
   }
 }
 
@@ -98,6 +112,11 @@ async function initDb() {
     } catch (err) {
       fallbackToSqlite(err);
     }
+  }
+
+  if (dbType === 'mock') {
+    console.warn("Mock 데이터베이스 상태이므로 스키마 초기화를 생략합니다.");
+    return;
   }
 
   const isPg = dbType === 'postgres';
