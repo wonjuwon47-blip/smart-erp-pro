@@ -1335,16 +1335,6 @@ if (formSalesBill) {
     // 명세서 기본 출력 진행
     if (shouldPrintSales) {
       triggerInvoicePrintDoc(newSale);
-      
-      // 라벨 스티커 출력 옵션 체크
-      const printToggle = document.getElementById("sales-label-print-toggle").value;
-      if (printToggle === "on") {
-        setTimeout(() => {
-          if (confirm("매출거래명세서 출력이 완료되었습니다.\n이어서 회사 규격 라벨 스티커(60mm x 60mm)를 추가로 출력하시겠습니까?")) {
-            triggerLabelPrintDoc(newSale);
-          }
-        }, 1000);
-      }
     } else {
       alert("매출 전표가 성공적으로 저장되었습니다.");
     }
@@ -1366,36 +1356,28 @@ if (formSalesBill) {
 }
 
 
-function triggerLabelPrintDoc(sale) {
+function getLabelHtml(sale) {
   const activeHq = db.headquarters.find(hq => hq.id === db.activeHqId) || db.headquarters[0];
-  const printArea = document.getElementById("print-document-area");
-  
-  // 공급처(공급받는 고객사) 정제
   let partnerCore = sale.partner.replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
-  if (partnerCore.length > 8) partnerCore = partnerCore.substring(0, 8); // 레이아웃 초과 방지
+  if (partnerCore.length > 8) partnerCore = partnerCore.substring(0, 8);
   
-  // 공급자(우리 본사) 정제
   let supplierCore = activeHq.name.replace(/\(주\)/g, "").split(" ")[0].trim();
   if (supplierCore.length > 5) supplierCore = supplierCore.substring(0, 5);
 
   let labelHtml = "";
   sale.items.forEach(item => {
-    // 품종 정제 (예: "경북 부사 사과 (10kg)" -> "사과")
     let itemNameCore = item.name.split("(")[0].trim().replace("경북 부사 ", "").replace("칠레산 ", "").replace("냉동 ", "");
     if (itemNameCore.length > 5) itemNameCore = itemNameCore.substring(0, 5);
     
-    // 산지 정제 (예: "국내산(청송)" -> "국내산")
-    let itemOrigin = item.origin.split("(")[0].trim();
+    let itemOrigin = item.origin ? item.origin.split("(")[0].trim() : "국내산";
     if (itemOrigin.length > 3) itemOrigin = itemOrigin.substring(0, 3);
 
-    // 날짜 포맷 (YYYY.MM.DD)
     const dateStr = sale.date.replace(/-/g, ".");
 
-    // 무게 파싱
     let weightVal = "1";
     let weightUnit = "EA";
     const nameMatch = item.name.match(/(\d+)\s*(kg|g|t|EA|BOX|L|ml)/i);
-    const originMatch = item.origin.match(/(\d+)\s*(kg|g|t|EA|BOX|L|ml)/i);
+    const originMatch = item.origin ? item.origin.match(/(\d+)\s*(kg|g|t|EA|BOX|L|ml)/i) : null;
     if (nameMatch) {
       weightVal = nameMatch[1];
       weightUnit = nameMatch[2].toLowerCase();
@@ -1412,34 +1394,38 @@ function triggerLabelPrintDoc(sale) {
         <!-- Row 1: 공급처 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
-          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900; letter-spacing: 1px;">${partnerCore}</div>
+          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900; letter-spacing: 1px;">${escapeHtml(partnerCore)}</div>
         </div>
         <!-- Row 2: 품종 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">품종</div>
-          <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900;">${itemNameCore}</div>
+          <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900;">${escapeHtml(itemNameCore)}</div>
           <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1; background: #fafafa;">산지</div>
-          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 18pt; font-weight: 900;">${itemOrigin}</div>
+          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 18pt; font-weight: 900;">${escapeHtml(itemOrigin)}</div>
         </div>
         <!-- Row 3: 무게 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">무게</div>
           <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: bold;">
-            <span style="font-size: 28pt; font-weight: 900; margin-right: 4px; font-family: 'Inter', sans-serif;">${weightVal}</span> ${weightUnit}
+            <span style="font-size: 28pt; font-weight: 900; margin-right: 4px; font-family: 'Inter', sans-serif;">${weightVal}</span> ${escapeHtml(weightUnit)}
           </div>
           <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1.1; background: #fafafa;">공급자</div>
-          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 10.5pt; font-weight: 900; text-align: center; line-height: 1.2;">${supplierCore}</div>
+          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 10.5pt; font-weight: 900; text-align: center; line-height: 1.2;">${escapeHtml(supplierCore)}</div>
         </div>
         <!-- Row 4: 포장일 -->
         <div style="display: flex; height: 25%;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; background: #fafafa;">포장일</div>
-          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 23pt; font-weight: 900; font-family: monospace; letter-spacing: 1.5px;">${dateStr}</div>
+          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 23pt; font-weight: 900; font-family: monospace; letter-spacing: 1.5px;">${escapeHtml(dateStr)}</div>
         </div>
       </div>
     `;
   });
+  return labelHtml;
+}
 
-  printArea.innerHTML = labelHtml;
+function triggerLabelPrintDoc(sale) {
+  const printArea = document.getElementById("print-document-area");
+  printArea.innerHTML = getLabelHtml(sale);
   window.print();
 }
 
@@ -1680,6 +1666,12 @@ function triggerInvoicePrintDoc(sale) {
         </div>
       </div>
     `;
+  }
+
+  const printToggleEl = document.getElementById("sales-label-print-toggle");
+  const isLabelOn = printToggleEl ? printToggleEl.value === "on" : false;
+  if (isLabelOn) {
+    fullHtml += `<div style="page-break-before: always;"></div>` + getLabelHtml(sale);
   }
 
   printArea.innerHTML = fullHtml;
@@ -3568,19 +3560,65 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
   
-  // 기간별 필터링 날짜 범위 디폴트 지정 (최근 1개월)
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-  const oneMonthAgoStr = oneMonthAgo.toISOString().substring(0, 10);
-  
-  if(document.getElementById("pur-filter-start")) document.getElementById("pur-filter-start").value = oneMonthAgoStr;
+  // 기간별 필터링 날짜 범위 디폴트 지정 (기본값 오늘 날짜)
+  if(document.getElementById("pur-filter-start")) document.getElementById("pur-filter-start").value = todayStr;
   if(document.getElementById("pur-filter-end")) document.getElementById("pur-filter-end").value = todayStr;
   if(document.getElementById("sales-filter-start")) document.getElementById("sales-filter-start").value = todayStr;
   if(document.getElementById("sales-filter-end")) document.getElementById("sales-filter-end").value = todayStr;
   
-  // 외상대금 기본 날짜 필터 지정
-  if(document.getElementById("receivable-filter-start")) document.getElementById("receivable-filter-start").value = oneMonthAgoStr;
+  // 외상대금 기본 날짜 필터 지정 (기본값 오늘 날짜)
+  if(document.getElementById("receivable-filter-start")) document.getElementById("receivable-filter-start").value = todayStr;
   if(document.getElementById("receivable-filter-end")) document.getElementById("receivable-filter-end").value = todayStr;
+
+  // 매입 부가세 10% 일괄 적용 버튼 핸들러
+  const btnPurApplyTax = document.getElementById("btn-pur-apply-tax");
+  if (btnPurApplyTax) {
+    btnPurApplyTax.addEventListener("click", () => {
+      const allApplied = purchaseCart.every(item => {
+        const prodMeta = db.products.find(p => p.name === item.name);
+        const isTaxable = !prodMeta || prodMeta.taxType !== TAX_TYPE_EXEMPT;
+        return !isTaxable || item.isTaxApplied;
+      });
+      purchaseCart.forEach((item, idx) => {
+        const prodMeta = db.products.find(p => p.name === item.name);
+        const isTaxable = !prodMeta || prodMeta.taxType !== TAX_TYPE_EXEMPT;
+        if (isTaxable) {
+          item.isTaxApplied = !allApplied;
+          item.tax = item.isTaxApplied ? Math.floor(item.amount * TAX_RATE) : 0;
+        } else {
+          item.isTaxApplied = false;
+          item.tax = 0;
+        }
+        item.total = item.amount + item.tax;
+      });
+      renderPurCart();
+    });
+  }
+
+  // 매출 부가세 10% 일괄 적용 버튼 핸들러
+  const btnSalesApplyTax = document.getElementById("btn-sales-apply-tax");
+  if (btnSalesApplyTax) {
+    btnSalesApplyTax.addEventListener("click", () => {
+      const allApplied = salesCart.every(item => {
+        const prodMeta = db.products.find(p => p.name === item.name);
+        const isTaxable = !prodMeta || prodMeta.taxType !== TAX_TYPE_EXEMPT;
+        return !isTaxable || item.isTaxApplied;
+      });
+      salesCart.forEach((item, idx) => {
+        const prodMeta = db.products.find(p => p.name === item.name);
+        const isTaxable = !prodMeta || prodMeta.taxType !== TAX_TYPE_EXEMPT;
+        if (isTaxable) {
+          item.isTaxApplied = !allApplied;
+          item.tax = item.isTaxApplied ? Math.floor(item.amount * TAX_RATE) : 0;
+        } else {
+          item.isTaxApplied = false;
+          item.tax = 0;
+        }
+        item.total = item.amount + item.tax;
+      });
+      renderSalesCart();
+    });
+  }
 
   // 라벨 인쇄 3D 토글 스위치 이벤트 처리
   const toggleWrapper = document.getElementById("label-print-toggle-wrapper");

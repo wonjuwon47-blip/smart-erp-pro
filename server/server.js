@@ -7,10 +7,12 @@ const db = require('./db');
 // 환경변수(.env) 파일 로드
 dotenv.config();
 
-const app = express();
+const app = reportApp();
+function reportApp() {
+  return express();
+}
 const PORT = process.env.PORT || 5000;
 
-// CORS 및 미들웨어 설정
 app.use(cors());
 app.use(express.json());
 
@@ -19,13 +21,13 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/erp', require('./routes/erp'));
 app.use('/api/ocr', require('./routes/ocr'));
 
-// 빌드된 프론트엔드 static 파일 호스팅 (Vite React 빌드 아웃풋)
-const distPath = path.resolve(__dirname, '../dist');
-app.use(express.static(distPath));
+// 정적 파일 서빙 대상: 프로젝트 루트 디렉토리를 서빙 (index.html, app.js, style.css)
+const rootPath = path.resolve(__dirname, '../');
+app.use(express.static(rootPath));
 
-// API가 아닌 라우트의 경우 React SPA 라우팅을 지원하기 위해 index.html 반환 (Catch-All)
+// API가 아닌 라우트의 경우 바닐라 JS index.html 반환 (Catch-All)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  res.sendFile(path.join(rootPath, 'index.html'));
 });
 
 // 데이터베이스 초기화 및 서버 기동
@@ -38,7 +40,7 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`====================================================`);
       console.log(`  Smart ERP Pro API 백엔드 서버 가동 중 (포트: ${PORT})`);
-      console.log(`  배포 타겟: Render (PostgreSQL / SQLite 하이브리드 지원)`);
+      console.log(`  바닐라 JS 프론트엔드가 호스팅되고 있습니다.`);
       console.log(`====================================================`);
     });
   } catch (err) {
