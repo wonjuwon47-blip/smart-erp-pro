@@ -39,7 +39,7 @@ async function startServer() {
     // 2. 서버 포트 리스닝 시작
     app.listen(PORT, () => {
       console.log(`====================================================`);
-      console.log(`  Smart ERP Pro API 백엔드 서버 가동 중 (포트: ${PORT})`);
+      console.log(`  AI SMART ERP API 백엔드 서버 가동 중 (포트: ${PORT})`);
       console.log(`  바닐라 JS 프론트엔드가 호스팅되고 있습니다.`);
       console.log(`====================================================`);
     });
