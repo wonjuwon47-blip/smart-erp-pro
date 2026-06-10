@@ -3073,7 +3073,7 @@ window.applyOcrCorrection = function() {
 // --- 10.1 엑셀 발주서 일괄 업로드 파서 및 매출전표 생성 ---
 let uploadedExcelRows = null;
 
-// 엑셀에서 추출한 날짜를 'YYYY-MM-DD'로 안전하게 변환 (타임존 보정 및 문자열 패턴 처리)
+// 엑셀에서 추출한 날짜를 'YYYY-MM-DD'로 안전하게 변환 (타임존 보정 및 다양한 문자열 패턴 대응)
 function formatDateString(val) {
   if (val === null || val === undefined || val === "") return "";
   
@@ -3098,30 +3098,46 @@ function formatDateString(val) {
     return `${y}-${m}-${d}`;
   }
   
-  // 3. 문자열 날짜 포맷 정규화
-  if (typeof val === 'string') {
-    let cleaned = val.replace(/[^0-9]/g, '').trim();
-    if (cleaned.length === 8) {
-      return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
-    }
-    if (cleaned.length === 6) {
-      return `20${cleaned.substring(0, 2)}-${cleaned.substring(2, 4)}-${cleaned.substring(4, 6)}`;
-    }
-    const parts = val.split(/[\/\-\.]/);
+  // 3. 문자열 날짜 처리
+  if (typeof val === 'string' || val instanceof String) {
+    const str = String(val).trim();
+    
+    // 점(.), 슬래시(/), 대시(-) 등으로 구분된 포맷
+    const parts = str.split(/[\/\-\.]/);
     if (parts.length === 3) {
       let year = parts[0].trim();
       let month = parts[1].trim().padStart(2, '0');
       let day = parts[2].trim().padStart(2, '0');
-      if (year.length === 2) year = '20' + year;
-      if (year.length === 4 && month.length === 2 && day.length === 2) {
+      if (year.length === 2) {
+        year = (parseInt(year, 10) > 50 ? '19' : '20') + year;
+      }
+      if (year.length === 4) {
         return `${year}-${month}-${day}`;
       }
     }
     
-    // YYYY-MM-DD 포맷과 근접한 경우
-    const match = val.replace(/[\/\.]/g, '-').trim();
-    if (match.match(/^\d{4}-\d{2}-\d{2}/)) {
-      return match.substring(0, 10);
+    // 구분자 없이 숫자로만 된 경우
+    let cleaned = str.replace(/[^0-9]/g, '').trim();
+    if (cleaned.length === 8) {
+      return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
+    }
+    if (cleaned.length === 6) {
+      // 260601 등 YYMMDD 패턴 여부 확인
+      const mo = parseInt(cleaned.substring(2, 4), 10);
+      const dy = parseInt(cleaned.substring(4, 6), 10);
+      if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
+        return `20${cleaned.substring(0, 2)}-${cleaned.substring(2, 4)}-${cleaned.substring(4, 6)}`;
+      }
+    }
+    
+    // YYYY-MM-DD 형태와 근접한 경우
+    const match = str.replace(/[\/\.]/g, '-').trim();
+    const regexMatch = match.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (regexMatch) {
+      const y = regexMatch[1];
+      const m = regexMatch[2].padStart(2, '0');
+      const d = regexMatch[3].padStart(2, '0');
+      return `${y}-${m}-${d}`;
     }
   }
   
@@ -3528,7 +3544,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const salesDateInput = document.getElementById("sales-date");
   const salesIncomingInput = document.getElementById("sales-item-incoming");
   if (salesDateInput && salesIncomingInput) {
-    salesDateInput.addEventListener("input", () => {
+    const onSalesDateChange = () => {
       salesIncomingInput.value = salesDateInput.value;
       salesCart.forEach(item => {
         item.incomingDate = salesDateInput.value;
@@ -3539,7 +3555,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (uploadedExcelRows && editingSalesId === null) {
         window.loadItemsFromExcel();
       }
-    });
+    };
+    salesDateInput.addEventListener("input", onSalesDateChange);
+    salesDateInput.addEventListener("change", onSalesDateChange);
   }
 
   // 매출처 변경 시 엑셀 발주 데이터 자동 연동
