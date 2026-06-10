@@ -1432,7 +1432,7 @@ function triggerLabelPrintDoc(sale) {
   window.print();
 }
 
-function triggerInvoicePrintDoc(sale) {
+function triggerInvoicePrintDoc(sale, forceLabelOff = false) {
   const activeHq = db.headquarters.find(hq => hq.id === db.activeHqId) || db.headquarters[0];
   const printSeal = db.settings.printSealImage || activeHq.stamp;
   const partnerMeta = db.partners.find(p => p.name === sale.partner) || { name: sale.partner, bizNo: "109-51-71804", owner: "박시안", address: "서울특별시 송파구 송파대로 167", phone: "02-478-7822" };
@@ -1672,7 +1672,7 @@ function triggerInvoicePrintDoc(sale) {
   }
 
   const printToggleEl = document.getElementById("sales-label-print-toggle");
-  const isLabelOn = printToggleEl ? printToggleEl.value === "on" : false;
+  const isLabelOn = !forceLabelOff && (printToggleEl ? printToggleEl.value === "on" : false);
   if (isLabelOn) {
     fullHtml += `<div style="page-break-before: always;"></div>` + getLabelHtml(sale);
   }
@@ -1969,7 +1969,7 @@ window.reprintLabel = function(idx) {
 
 window.reprintInvoice = function(idx) {
   const sale = db.sales[idx];
-  if(sale) triggerInvoicePrintDoc(sale);
+  if(sale) triggerInvoicePrintDoc(sale, true);
 };
 
 window.deleteSales = function(idx) {
