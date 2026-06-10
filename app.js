@@ -114,7 +114,15 @@ const defaultDb = {
     hkF7: "purchase",
     hkF8: "receivables",
     hkF9: "excel-import",
-    printSealImage: ""
+    printSealImage: "",
+    labelFonts: {
+      title: 22,
+      product: 22,
+      origin: 18,
+      weight: 28,
+      supplier: 10.5,
+      date: 23
+    }
   },
   // 거래처별 수금/지급액 누계 (외상 관리용)
   receivablesPayments: {},
@@ -129,6 +137,16 @@ if (!db.settings.hkF7) db.settings.hkF7 = "purchase";
 if (!db.settings.hkF8) db.settings.hkF8 = "receivables";
 if (!db.settings.hkF9) db.settings.hkF9 = "excel-import";
 if (db.settings.printSealImage === undefined) db.settings.printSealImage = "";
+if (!db.settings.labelFonts) {
+  db.settings.labelFonts = {
+    title: 22,
+    product: 22,
+    origin: 18,
+    weight: 28,
+    supplier: 10.5,
+    date: 23
+  };
+}
 
 let isSyncing = false;
 
@@ -1490,28 +1508,28 @@ function getLabelHtml(sale) {
         <!-- Row 1: 공급처 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
-          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900; letter-spacing: 1px;">${escapeHtml(partnerCore)}</div>
+          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: ${db.settings.labelFonts.title}pt; font-weight: 900; letter-spacing: 1px;">${escapeHtml(partnerCore)}</div>
         </div>
         <!-- Row 2: 품종 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">품종</div>
-          <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900;">${escapeHtml(itemNameCore)}</div>
+          <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: ${db.settings.labelFonts.product}pt; font-weight: 900;">${escapeHtml(itemNameCore)}</div>
           <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1; background: #fafafa;">산지</div>
-          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 18pt; font-weight: 900;">${escapeHtml(itemOrigin)}</div>
+          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: ${db.settings.labelFonts.origin}pt; font-weight: 900;">${escapeHtml(itemOrigin)}</div>
         </div>
         <!-- Row 3: 무게 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">무게</div>
           <div style="width: 48%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: bold;">
-            <span style="font-size: 28pt; font-weight: 900; margin-right: 4px; font-family: 'Inter', sans-serif;">${weightVal}</span> ${escapeHtml(weightUnit)}
+            <span style="font-size: ${db.settings.labelFonts.weight}pt; font-weight: 900; margin-right: 4px; font-family: 'Inter', sans-serif;">${weightVal}</span> ${escapeHtml(weightUnit)}
           </div>
           <div style="width: 12%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; line-height: 1.1; background: #fafafa;">공급자</div>
-          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: 10.5pt; font-weight: 900; text-align: center; line-height: 1.2;">${escapeHtml(supplierCore)}</div>
+          <div style="width: 25%; display: flex; align-items: center; justify-content: center; font-size: ${db.settings.labelFonts.supplier}pt; font-weight: 900; text-align: center; line-height: 1.2;">${escapeHtml(supplierCore)}</div>
         </div>
         <!-- Row 4: 포장일 -->
         <div style="display: flex; height: 25%;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; background: #fafafa;">포장일</div>
-          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: 23pt; font-weight: 900; font-family: monospace; letter-spacing: 1.5px;">${escapeHtml(dateStr)}</div>
+          <div style="width: 85%; display: flex; align-items: center; justify-content: center; font-size: ${db.settings.labelFonts.date}pt; font-weight: 900; font-family: monospace; letter-spacing: 1.5px;">${escapeHtml(dateStr)}</div>
         </div>
       </div>
     `;
@@ -3441,6 +3459,31 @@ if (formTemplate) {
     db.settings.hkF9 = document.getElementById("setting-hk-f9").value;
     saveDb();
     alert("템플릿 정보 및 전역 단축버튼 지정이 완료되었습니다.");
+  };
+}
+
+// 라벨 디자인 설정 폼 연동
+const formLabel = document.getElementById("form-label-settings");
+if (formLabel) {
+  document.getElementById("setting-lbl-font-title").value = db.settings.labelFonts.title;
+  document.getElementById("setting-lbl-font-product").value = db.settings.labelFonts.product;
+  document.getElementById("setting-lbl-font-origin").value = db.settings.labelFonts.origin;
+  document.getElementById("setting-lbl-font-weight").value = db.settings.labelFonts.weight;
+  document.getElementById("setting-lbl-font-supplier").value = db.settings.labelFonts.supplier;
+  document.getElementById("setting-lbl-font-date").value = db.settings.labelFonts.date;
+
+  formLabel.onsubmit = (e) => {
+    e.preventDefault();
+    db.settings.labelFonts = {
+      title: parseFloat(document.getElementById("setting-lbl-font-title").value) || 22,
+      product: parseFloat(document.getElementById("setting-lbl-font-product").value) || 22,
+      origin: parseFloat(document.getElementById("setting-lbl-font-origin").value) || 18,
+      weight: parseFloat(document.getElementById("setting-lbl-font-weight").value) || 28,
+      supplier: parseFloat(document.getElementById("setting-lbl-font-supplier").value) || 10.5,
+      date: parseFloat(document.getElementById("setting-lbl-font-date").value) || 23
+    };
+    saveDb();
+    alert("라벨 스티커 디자인 글꼴 설정이 저장되었습니다.");
   };
 }
 
