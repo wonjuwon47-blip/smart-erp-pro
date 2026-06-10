@@ -68,12 +68,15 @@ const defaultDb = {
     { code: "P001", name: "한울농산 (매입처)", owner: "최한울", bizNo: "113-22-99887", address: "경기도 여주시 가남읍 33", phone: "031-443-1234", type: "매입처" },
     { code: "P002", name: "서해어업 (매입처)", owner: "서서해", bizNo: "220-41-11223", address: "충청남도 보령시 해안로 10", phone: "041-930-5566", type: "매입처" },
     { code: "P003", name: "이마트 가락점 (매출처)", owner: "강이마트", bizNo: "105-87-00991", address: "서울특별시 송파구 양재대로 932", phone: "02-400-8877", type: "매출처" },
-    { code: "P004", name: "롯데슈퍼 신촌점 (매출처)", owner: "이롯데", bizNo: "106-88-22334", address: "서울특별시 마포구 백범로 22", phone: "02-334-9988", type: "매출처" }
+    { code: "P004", name: "롯데슈퍼 신촌점 (매출처)", owner: "이롯데", bizNo: "106-88-22334", address: "서울특별시 마포구 백범로 22", phone: "02-334-9988", type: "매출처" },
+    { code: "P005", name: "남호초등학교 (매출처)", owner: "홍교장", bizNo: "123-45-67890", address: "강원도 원주시", phone: "033-123-4567", type: "매출처" }
   ],
   products: [
     { code: "PRD001", name: "경북 부사 사과 (10kg)", unit: "BOX", origin: "국내산(청송)", purchasePrice: 22000, salesPrice: 32000, taxType: "면세", stock: 120 },
     { code: "PRD002", name: "칠레산 포도 (5kg)", unit: "BOX", origin: "칠레산", purchasePrice: 15000, salesPrice: 24000, taxType: "과세", stock: 85 },
-    { code: "PRD003", name: "냉동 흰다리새우 (1kg)", unit: "EA", origin: "베트남산", purchasePrice: 8500, salesPrice: 13000, taxType: "과세", stock: 240 }
+    { code: "PRD003", name: "냉동 흰다리새우 (1kg)", unit: "EA", origin: "베트남산", purchasePrice: 8500, salesPrice: 13000, taxType: "과세", stock: 240 },
+    { code: "PRD004", name: "감자", unit: "kg", origin: "국내산", purchasePrice: 1500, salesPrice: 2641, taxType: "면세", stock: 500 },
+    { code: "PRD005", name: "고추(청양고추)", unit: "kg", origin: "국내산", purchasePrice: 4000, salesPrice: 6163, taxType: "과세", stock: 300 }
   ],
   purchases: [
     { 
