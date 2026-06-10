@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart ERP - 이지폼 완벽 계승 솔루션</title>
-  <link rel="stylesheet" href="style.css?v=20260610_v2">
+  <link rel="stylesheet" href="style.css">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- SheetJS Excel Library -->
@@ -13,6 +13,65 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
+
+  <!-- 로그인 / 회원가입 인증 화면 (실시간 클라우드 공유용) -->
+  <div id="auth-overlay" style="display: flex; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at top right, #2c1b4d, #0f0c1b); z-index: 9999; align-items: center; justify-content: center; font-family: 'Noto Sans KR', sans-serif; padding: 20px; box-sizing: border-box;">
+    <div style="background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 40px 32px; width: 100%; max-width: 420px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4); text-align: center; box-sizing: border-box;">
+      <div style="margin-bottom: 32px;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #a78bfa, #818cf8); color: #fff; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);">
+          <i data-lucide="shield" style="width: 28px; height: 28px;"></i>
+        </div>
+        <h2 style="margin: 0 0 8px 0; color: #fff; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px;">Smart ERP Pro</h2>
+        <p id="auth-subtitle" style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 0.9rem;">회사 통합 업무 재무 관리 시스템 로그인</p>
+      </div>
+
+      <div id="auth-error-msg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; border-radius: 8px; padding: 12px; font-size: 0.85rem; margin-bottom: 20px; text-align: left; line-height: 1.4;"></div>
+
+      <form id="form-auth" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="text-align: left;">
+          <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">아이디 (ID)</label>
+          <div style="position: relative;">
+            <i data-lucide="user" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+            <input type="text" id="auth-username" placeholder="아이디를 입력하세요" required style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <div style="text-align: left;">
+          <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">비밀번호</label>
+          <div style="position: relative;">
+            <i data-lucide="lock" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+            <input type="password" id="auth-password" placeholder="비밀번호를 입력하세요" required style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <!-- 회원가입 추가 필드들 -->
+        <div id="auth-register-fields" style="display: none; flex-direction: column; gap: 16px;">
+          <div style="text-align: left;">
+            <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">회사명 (신규 등록)</label>
+            <div style="position: relative;">
+              <i data-lucide="briefcase" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+              <input type="text" id="auth-company-name" placeholder="회사 상호명을 입력하세요" style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+
+          <div style="text-align: left;">
+            <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">성명 (사용자 실명)</label>
+            <div style="position: relative;">
+              <i data-lucide="user-check" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+              <input type="text" id="auth-user-fullname" placeholder="본인의 이름을 입력하세요" style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-auth-submit" style="margin-top: 8px; padding: 14px; background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; border-radius: 8px; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); transition: opacity 0.2s;">로그인 완료</button>
+      </form>
+
+      <div style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.5);">
+        <span id="auth-mode-msg">아직 회사 계정이 없으신가요?</span>
+        <span id="btn-auth-toggle-mode" style="color: #c084fc; cursor: pointer; font-weight: 600; text-decoration: underline; margin-left: 4px;">신규 개설 및 가입</span>
+      </div>
+    </div>
+  </div>
 
   <div class="app-container">
     <!-- Sidebar Navigation -->
@@ -84,6 +143,12 @@
         </div>
       </nav>
       
+      <!-- 로그인 상태 표시 및 로그아웃 단추 -->
+      <div style="border-top: 1px solid var(--panel-border); padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <span style="font-size: 0.82rem; color: #e9d5ff; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" id="user-display-name">로딩 중...</span>
+        <button id="btn-logout" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem; line-height: 1; border-radius: 4px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); cursor: pointer; color: #fca5a5;">로그아웃</button>
+      </div>
+
       <div style="border-top: 1px solid var(--panel-border); padding-top: 12px; font-size: 0.8rem; color: var(--text-muted);">
         <span>단축키 가이드:</span><br>
         <span class="hotkey-badge">F2</span> 거래등록 | <span class="hotkey-badge">F4</span> 저장 | <span class="hotkey-badge">F7</span> 인쇄 | <span class="hotkey-badge">F8</span> 취소 | <span class="hotkey-badge">F9</span> OCR스캔
@@ -948,34 +1013,100 @@
           <!-- Left: 인쇄 설정 -->
           <div class="card">
             <h2>인쇄 용지 및 프린터 설정</h2>
-            <form id="form-print-settings" style="margin-top: 16px;">
-              <div class="form-group">
-                <label>출력 용지 규격</label>
-                <select id="setting-paper-size">
-                  <option value="A5_Landscape">A5 가로형 (거래명세서 2분할 호환)</option>
-                  <option value="A4_Vertical">A4 세로형 표준 거래명세표</option>
-                </select>
+            <form id="form-print-settings" style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>출력 용지 규격</label>
+                  <select id="setting-paper-size">
+                    <option value="A5_Landscape">A5 가로형 (거래명세서 2분할 호환)</option>
+                    <option value="A4_Vertical">A4 세로형 표준 거래명세표</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>인쇄 글꼴 크기 (pt)</label>
+                  <input type="number" id="setting-font-size" value="10" min="6" max="14">
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>상단 여백 (px)</label>
+                  <input type="number" id="setting-margin-top" value="15" min="0" max="100">
+                </div>
+                <div class="form-group">
+                  <label>좌측 여백 (px)</label>
+                  <input type="number" id="setting-margin-left" value="15" min="0" max="100">
+                </div>
               </div>
               <div class="form-group">
-                <label>라벨 스티커 프린터 선택</label>
-                <select id="setting-label-printer">
-                  <option value="Standard_A4">A4 규격 기본 프린터</option>
-                  <option value="Sticker_75x50">라벨 전용 감열 프린터 (75mm x 50mm)</option>
-                </select>
+                <label>명세서 상단 표기 문구 (로고 텍스트)</label>
+                <input type="text" id="setting-logo-text" value="[공급자 보관용]" placeholder="예: [공급자 보관용] 또는 회사명 표기">
               </div>
-              
+
               <!-- 대표자 직인 설정 -->
               <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
                 <label>통합 거래명세서 대표자 직인 설정 (A5/A4 공용)</label>
                 <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
-                  <input type="file" id="print-seal-file" accept="image/*" style="display: none;">
-                  <button type="button" class="btn" style="font-size: 0.78rem; background: rgba(255,255,255,0.06)" onclick="document.getElementById('print-seal-file').click()">직인 업로드</button>
-                  <button type="button" id="btn-delete-seal" class="btn btn-danger" style="font-size: 0.78rem; display: none;">삭제</button>
+                  <input type="file" id="setting-print-seal-image" accept="image/*" style="display: none;">
+                  <button type="button" class="btn" style="font-size: 0.78rem; background: rgba(255,255,255,0.06)" onclick="document.getElementById('setting-print-seal-image').click()">직인 업로드</button>
+                  <button type="button" id="btn-delete-print-seal" class="btn btn-danger" style="font-size: 0.78rem; display: none;">삭제</button>
                   <div id="print-seal-preview" style="width: 42px; height: 42px; background: #fff; border-radius: 4px; display: none; align-items: center; justify-content: center; padding: 2px;">
-                    <img src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                    <img id="print-seal-preview-img" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                  </div>
+                  <span id="print-seal-preview-placeholder" style="font-size: 0.75rem; color: var(--text-muted);">업로드된 직인 없음</span>
+                </div>
+              </div>
+
+              <!-- 시스템 단축키 설정 -->
+              <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
+                <label style="font-weight: bold; margin-bottom: 12px; display: block;">시스템 단축키 지정 설정</label>
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>F2 키 동작</label>
+                    <select id="setting-hk-f2">
+                      <option value="sales">매출 거래 관리 이동</option>
+                      <option value="purchase">매입 거래 관리 이동</option>
+                      <option value="receivables">외상대금/미수금 관리 이동</option>
+                      <option value="dashboard">통합 대시보드 이동</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>F4 키 동작</label>
+                    <select id="setting-hk-f4">
+                      <option value="save">원장 저장 및 클라우드 동기화</option>
+                      <option value="dashboard">통합 대시보드 이동</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-grid" style="margin-top: 10px;">
+                  <div class="form-group">
+                    <label>F7 키 동작</label>
+                    <select id="setting-hk-f7">
+                      <option value="purchase">매입 거래 관리 이동</option>
+                      <option value="sales">매출 거래 관리 이동</option>
+                      <option value="estimates">견적서 관리 이동</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>F8 키 동작</label>
+                    <select id="setting-hk-f8">
+                      <option value="receivables">외상대금/미수금 관리 이동</option>
+                      <option value="estimates">견적서 관리 이동</option>
+                      <option value="settings">설정 이동</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-grid" style="margin-top: 10px;">
+                  <div class="form-group" style="grid-column: span 2;">
+                    <label>F9 키 동작</label>
+                    <select id="setting-hk-f9">
+                      <option value="excel-import">발주 엑셀 업로드 팝업 트리거</option>
+                      <option value="ocr-scan">매입 명세표 OCR 카메라/이미지 스캔</option>
+                    </select>
                   </div>
                 </div>
               </div>
+
+              <button type="submit" class="btn btn-primary" style="margin-top: 16px;"><i data-lucide="save"></i> 설정 저장 및 단축키 바인딩</button>
             </form>
           </div>
 
@@ -1049,6 +1180,6 @@
   </style>
 
   <!-- ERP Logic Script -->
-  <script src="app.js?v=20260610_v2"></script>
+  <script src="app.js"></script>
 </body>
 </html>

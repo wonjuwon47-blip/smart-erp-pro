@@ -68,15 +68,12 @@ const defaultDb = {
     { code: "P001", name: "한울농산 (매입처)", owner: "최한울", bizNo: "113-22-99887", address: "경기도 여주시 가남읍 33", phone: "031-443-1234", type: "매입처" },
     { code: "P002", name: "서해어업 (매입처)", owner: "서서해", bizNo: "220-41-11223", address: "충청남도 보령시 해안로 10", phone: "041-930-5566", type: "매입처" },
     { code: "P003", name: "이마트 가락점 (매출처)", owner: "강이마트", bizNo: "105-87-00991", address: "서울특별시 송파구 양재대로 932", phone: "02-400-8877", type: "매출처" },
-    { code: "P004", name: "롯데슈퍼 신촌점 (매출처)", owner: "이롯데", bizNo: "106-88-22334", address: "서울특별시 마포구 백범로 22", phone: "02-334-9988", type: "매출처" },
-    { code: "P005", name: "남호초등학교 (매출처)", owner: "홍교장", bizNo: "123-45-67890", address: "강원도 원주시", phone: "033-123-4567", type: "매출처" }
+    { code: "P004", name: "롯데슈퍼 신촌점 (매출처)", owner: "이롯데", bizNo: "106-88-22334", address: "서울특별시 마포구 백범로 22", phone: "02-334-9988", type: "매출처" }
   ],
   products: [
     { code: "PRD001", name: "경북 부사 사과 (10kg)", unit: "BOX", origin: "국내산(청송)", purchasePrice: 22000, salesPrice: 32000, taxType: "면세", stock: 120 },
     { code: "PRD002", name: "칠레산 포도 (5kg)", unit: "BOX", origin: "칠레산", purchasePrice: 15000, salesPrice: 24000, taxType: "과세", stock: 85 },
-    { code: "PRD003", name: "냉동 흰다리새우 (1kg)", unit: "EA", origin: "베트남산", purchasePrice: 8500, salesPrice: 13000, taxType: "과세", stock: 240 },
-    { code: "PRD004", name: "감자", unit: "kg", origin: "국내산", purchasePrice: 1500, salesPrice: 2641, taxType: "면세", stock: 500 },
-    { code: "PRD005", name: "고추(청양고추)", unit: "kg", origin: "국내산", purchasePrice: 4000, salesPrice: 6163, taxType: "과세", stock: 300 }
+    { code: "PRD003", name: "냉동 흰다리새우 (1kg)", unit: "EA", origin: "베트남산", purchasePrice: 8500, salesPrice: 13000, taxType: "과세", stock: 240 }
   ],
   purchases: [
     { 
@@ -133,28 +130,108 @@ if (!db.settings.hkF8) db.settings.hkF8 = "receivables";
 if (!db.settings.hkF9) db.settings.hkF9 = "excel-import";
 if (db.settings.printSealImage === undefined) db.settings.printSealImage = "";
 
-// 필수 샘플 거래처 및 품목 자동 병합 (엑셀 연동 테스트용 캐시 자가치유)
-if (db.partners) {
-  const hasNamho = db.partners.some(p => p.name.includes("남호초등학교"));
-  if (!hasNamho) {
-    db.partners.push({ code: "P005", name: "남호초등학교 (매출처)", owner: "홍교장", bizNo: "123-45-67890", address: "강원도 원주시", phone: "033-123-4567", type: "매출처" });
-  }
-}
-if (db.products) {
-  const hasPotato = db.products.some(p => p.name === "감자");
-  if (!hasPotato) {
-    db.products.push({ code: "PRD004", name: "감자", unit: "kg", origin: "국내산", purchasePrice: 1500, salesPrice: 2641, taxType: "면세", stock: 500 });
-    db.products.push({ code: "PRD005", name: "고추(청양고추)", unit: "kg", origin: "국내산", purchasePrice: 4000, salesPrice: 6163, taxType: "과세", stock: 300 });
-  }
-}
-localStorage.setItem("erp_db_pro", JSON.stringify(db));
+let isSyncing = false;
 
 function saveDb() {
   localStorage.setItem("erp_db_pro", JSON.stringify(db));
   updateDashboard();
   renderReceivablesAndPayables();
   renderEstimatesList();
+  
+  if (localStorage.getItem("erp_jwt_token") && !isSyncing) {
+    syncToCloud();
+  }
 }
+
+async function syncToCloud() {
+  const token = localStorage.getItem("erp_jwt_token");
+  if (!token) return;
+  
+  isSyncing = true;
+  try {
+    const response = await fetch("/api/erp/backup/import", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        version: "smart-erp-pro-v1",
+        headquarters: db.headquarters,
+        partners: db.partners,
+        products: db.products,
+        invoices: db.invoices,
+        invoiceItems: db.invoiceItems,
+        employees: db.employees,
+        banks: db.banks,
+        settings: db.settings,
+        receivablesPayments: db.receivablesPayments,
+        estimates: db.estimates
+      })
+    });
+    
+    if (!response.ok) {
+      console.warn("클라우드 동기화 실패:", await response.text());
+    } else {
+      console.log("클라우드 동기화 성공");
+    }
+  } catch (err) {
+    console.error("클라우드 동기화 네트워크 오류:", err);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+async function syncFromCloud() {
+  const token = localStorage.getItem("erp_jwt_token");
+  if (!token) return;
+  
+  isSyncing = true;
+  try {
+    const response = await fetch("/api/erp/backup/export", {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("클라우드 데이터 가져옴:", data);
+      
+      db.headquarters = data.headquarters || db.headquarters || [];
+      db.partners = data.partners || db.partners || [];
+      db.products = data.products || db.products || [];
+      db.invoices = data.invoices || db.invoices || [];
+      db.invoiceItems = data.invoiceItems || db.invoiceItems || [];
+      db.employees = data.employees || db.employees || [];
+      db.banks = data.banks || db.banks || [];
+      db.settings = data.settings || db.settings;
+      db.receivablesPayments = data.receivablesPayments || db.receivablesPayments || {};
+      db.estimates = data.estimates || db.estimates || [];
+      
+      localStorage.setItem("erp_db_pro", JSON.stringify(db));
+      
+      updateDashboard();
+      renderReceivablesAndPayables();
+      renderEstimatesList();
+      renderHeadquarters();
+      renderEmployees();
+      renderBanks();
+      renderPartners();
+      renderProducts();
+      renderSelectOptions();
+      renderPurchaseList();
+      renderSalesList();
+    } else {
+      console.warn("클라우드 데이터 로드 실패:", await response.text());
+    }
+  } catch (err) {
+    console.error("클라우드 데이터 로드 네트워크 오류:", err);
+  } finally {
+    isSyncing = false;
+  }
+}
+
 
 // --- 2. 탭 전환 및 서브탭 통제 ---
 const menuItems = document.querySelectorAll(".menu-item[data-tab]");
@@ -1448,7 +1525,7 @@ function triggerLabelPrintDoc(sale) {
   window.print();
 }
 
-function triggerInvoicePrintDoc(sale, forceLabelOff = false) {
+function triggerInvoicePrintDoc(sale) {
   const activeHq = db.headquarters.find(hq => hq.id === db.activeHqId) || db.headquarters[0];
   const printSeal = db.settings.printSealImage || activeHq.stamp;
   const partnerMeta = db.partners.find(p => p.name === sale.partner) || { name: sale.partner, bizNo: "109-51-71804", owner: "박시안", address: "서울특별시 송파구 송파대로 167", phone: "02-478-7822" };
@@ -1688,7 +1765,7 @@ function triggerInvoicePrintDoc(sale, forceLabelOff = false) {
   }
 
   const printToggleEl = document.getElementById("sales-label-print-toggle");
-  const isLabelOn = !forceLabelOff && (printToggleEl ? printToggleEl.value === "on" : false);
+  const isLabelOn = printToggleEl ? printToggleEl.value === "on" : false;
   if (isLabelOn) {
     fullHtml += `<div style="page-break-before: always;"></div>` + getLabelHtml(sale);
   }
@@ -1985,7 +2062,7 @@ window.reprintLabel = function(idx) {
 
 window.reprintInvoice = function(idx) {
   const sale = db.sales[idx];
-  if(sale) triggerInvoicePrintDoc(sale, true);
+  if(sale) triggerInvoicePrintDoc(sale);
 };
 
 window.deleteSales = function(idx) {
@@ -3092,7 +3169,7 @@ window.applyOcrCorrection = function() {
 // --- 10.1 엑셀 발주서 일괄 업로드 파서 및 매출전표 생성 ---
 let uploadedExcelRows = null;
 
-// 엑셀에서 추출한 날짜를 'YYYY-MM-DD'로 안전하게 변환 (타임존 보정 및 다양한 문자열 패턴 대응)
+// 엑셀에서 추출한 날짜를 'YYYY-MM-DD'로 안전하게 변환 (타임존 보정 및 문자열 패턴 처리)
 function formatDateString(val) {
   if (val === null || val === undefined || val === "") return "";
   
@@ -3117,46 +3194,30 @@ function formatDateString(val) {
     return `${y}-${m}-${d}`;
   }
   
-  // 3. 문자열 날짜 처리
-  if (typeof val === 'string' || val instanceof String) {
-    const str = String(val).trim();
-    
-    // 점(.), 슬래시(/), 대시(-) 등으로 구분된 포맷
-    const parts = str.split(/[\/\-\.]/);
-    if (parts.length === 3) {
-      let year = parts[0].trim();
-      let month = parts[1].trim().padStart(2, '0');
-      let day = parts[2].trim().padStart(2, '0');
-      if (year.length === 2) {
-        year = (parseInt(year, 10) > 50 ? '19' : '20') + year;
-      }
-      if (year.length === 4) {
-        return `${year}-${month}-${day}`;
-      }
-    }
-    
-    // 구분자 없이 숫자로만 된 경우
-    let cleaned = str.replace(/[^0-9]/g, '').trim();
+  // 3. 문자열 날짜 포맷 정규화
+  if (typeof val === 'string') {
+    let cleaned = val.replace(/[^0-9]/g, '').trim();
     if (cleaned.length === 8) {
       return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
     }
     if (cleaned.length === 6) {
-      // 260601 등 YYMMDD 패턴 여부 확인
-      const mo = parseInt(cleaned.substring(2, 4), 10);
-      const dy = parseInt(cleaned.substring(4, 6), 10);
-      if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
-        return `20${cleaned.substring(0, 2)}-${cleaned.substring(2, 4)}-${cleaned.substring(4, 6)}`;
+      return `20${cleaned.substring(0, 2)}-${cleaned.substring(2, 4)}-${cleaned.substring(4, 6)}`;
+    }
+    const parts = val.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      let year = parts[0].trim();
+      let month = parts[1].trim().padStart(2, '0');
+      let day = parts[2].trim().padStart(2, '0');
+      if (year.length === 2) year = '20' + year;
+      if (year.length === 4 && month.length === 2 && day.length === 2) {
+        return `${year}-${month}-${day}`;
       }
     }
     
-    // YYYY-MM-DD 형태와 근접한 경우
-    const match = str.replace(/[\/\.]/g, '-').trim();
-    const regexMatch = match.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if (regexMatch) {
-      const y = regexMatch[1];
-      const m = regexMatch[2].padStart(2, '0');
-      const d = regexMatch[3].padStart(2, '0');
-      return `${y}-${m}-${d}`;
+    // YYYY-MM-DD 포맷과 근접한 경우
+    const match = val.replace(/[\/\.]/g, '-').trim();
+    if (match.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return match.substring(0, 10);
     }
   }
   
@@ -3176,6 +3237,17 @@ function getExcelRowValue(row, possibleKeys) {
     }
   }
   return null;
+}
+
+// 학교명 및 거래처 핵심 이름 추출 헬퍼 (매칭 유연성 극대화)
+function getCorePartnerName(name) {
+  if (!name) return "";
+  return String(name)
+    .replace(/\s+/g, "") // 모든 공백 제거
+    .replace(/\(매출처\)|\(매입처\)|\(혼합\)/gi, "") // 괄호 용어 제거
+    .replace(/(초등학교|중학교|고등학교|유치원|학교|초등|중교|고교|초)/gi, "") // 학교 접미사 제거
+    .split(" (")[0]
+    .trim();
 }
 
 window.loadItemsFromExcel = function(force = false) {
@@ -3198,33 +3270,26 @@ window.loadItemsFromExcel = function(force = false) {
 
   if (!targetDate || !targetPartner) return;
 
-  // 매출처명 정제 (선택지 괄호 꼬임 방지)
-  const cleanPartnerName = targetPartner.replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
-
-  console.log("loadItemsFromExcel: Target Date:", targetDate, "Target Partner:", cleanPartnerName);
+  // 매출처명 핵심 이름 추출 (예: "남호초등학교" -> "남호")
+  const cleanPartnerName = getCorePartnerName(targetPartner);
 
   // 매칭 행 필터링
-  const matchingRows = uploadedExcelRows.filter((row, idx) => {
+  const matchingRows = uploadedExcelRows.filter(row => {
     const partnerKeys = ['학교', '거래처', '거래처명', '납품처', '바이어', '매출처', '수신', '상호명'];
     const partnerVal = getExcelRowValue(row, partnerKeys) || "";
-    const cleanRowPartner = String(partnerVal).replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
+    const cleanRowPartner = getCorePartnerName(partnerVal);
     if (!cleanRowPartner) return false;
 
     const dateKeys = ['납품일자', '입고일', '납품기한', '일자', '날짜', '매출일자', '배송일'];
     const dateVal = getExcelRowValue(row, dateKeys) || "";
     const formattedRowDate = formatDateString(dateVal);
 
+    // 핵심 상호명이 서로 포함관계인지 체크 (예: "남호" === "남호")
     const partnerMatches = cleanRowPartner.includes(cleanPartnerName) || cleanPartnerName.includes(cleanRowPartner);
     const dateMatches = formattedRowDate === targetDate;
 
-    if (idx < 5) {
-      console.log(`Excel Row ${idx} Debug: RowPartner: "${cleanRowPartner}" (matches "${cleanPartnerName}"? ${partnerMatches}), RowDate: "${formattedRowDate}" (matches "${targetDate}"? ${dateMatches})`);
-    }
-
     return partnerMatches && dateMatches;
   });
-
-  console.log("loadItemsFromExcel: Total Matching Rows found:", matchingRows.length);
 
   const statusEl = document.getElementById("excel-upload-status");
   if (matchingRows.length === 0) {
@@ -3275,7 +3340,8 @@ window.loadItemsFromExcel = function(force = false) {
       price: price || prodMeta.salesPrice || 0,
       amount: amount,
       tax: tax,
-      total: total
+      total: total,
+      isTaxApplied: false
     });
   });
 
@@ -3287,51 +3353,7 @@ window.loadItemsFromExcel = function(force = false) {
   }
 };
 
-const salesExcelFile = document.getElementById("sales-excel-file");
-const excelUploadStatus = document.getElementById("excel-upload-status");
 
-if (salesExcelFile) {
-  salesExcelFile.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    excelUploadStatus.textContent = `${file.name} 분석 중...`;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        
-        const rows = XLSX.utils.sheet_to_json(sheet);
-        
-        if (rows.length === 0) {
-          alert("엑셀 시트 내 데이터 행이 존재하지 않습니다.");
-          excelUploadStatus.textContent = "가져오기 실패";
-          return;
-        }
-
-        uploadedExcelRows = rows;
-        excelUploadStatus.textContent = `엑셀 로드됨: ${file.name} (총 ${rows.length}행)`;
-        excelUploadStatus.style.color = "var(--success-color)";
-        
-        const btnLoad = document.getElementById("btn-load-excel-items");
-        if (btnLoad) btnLoad.style.display = "inline-block";
-
-        alert("엑셀 파일이 성공적으로 로드되었습니다.\n매출일자와 매출처를 선택하시면 해당 데이터를 자동으로 불러옵니다.");
-        
-        window.loadItemsFromExcel();
-      } catch (err) {
-        console.error(err);
-        excelUploadStatus.textContent = "에러 발생";
-        alert("엑셀 파일 구조 분석 중 문제가 발생했습니다. 파일을 다시 한 번 확인해 주세요.");
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
 
 // --- 11. 시스템 설정 및 단축키 핸들링 ---
 const formPrint = document.getElementById("form-print-settings");
@@ -3543,8 +3565,54 @@ if (btnDbReset) {
   });
 }
 
-// --- 13. 초기 구동 렌더링 세트 ---
 document.addEventListener("DOMContentLoaded", () => {
+  // 엑셀 발주서 업로드 이벤트 바인딩 (안전한 DOMContentLoaded 내부 이전)
+  const salesExcelFile = document.getElementById("sales-excel-file");
+  const excelUploadStatus = document.getElementById("excel-upload-status");
+
+  if (salesExcelFile) {
+    salesExcelFile.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      excelUploadStatus.textContent = `${file.name} 분석 중...`;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          
+          const rows = XLSX.utils.sheet_to_json(sheet);
+          
+          if (rows.length === 0) {
+            alert("엑셀 시트 내 데이터 행이 존재하지 않습니다.");
+            excelUploadStatus.textContent = "가져오기 실패";
+            return;
+          }
+
+          uploadedExcelRows = rows;
+          excelUploadStatus.textContent = `엑셀 로드됨: ${file.name} (총 ${rows.length}행)`;
+          excelUploadStatus.style.color = "var(--success-color)";
+          
+          const btnLoad = document.getElementById("btn-load-excel-items");
+          if (btnLoad) btnLoad.style.display = "inline-block";
+
+          alert("엑셀 파일이 성공적으로 로드되었습니다.\n매출일자와 매출처를 선택하시면 해당 데이터를 자동으로 불러옵니다.");
+          
+          window.loadItemsFromExcel();
+        } catch (err) {
+          console.error(err);
+          excelUploadStatus.textContent = "에러 발생";
+          alert("엑셀 파일 구조 분석 중 문제가 발생했습니다. 파일을 다시 한 번 확인해 주세요.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
   if (window.lucide) window.lucide.createIcons();
 
   const todayStr = new Date().toISOString().substring(0, 10);
@@ -3571,7 +3639,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const salesDateInput = document.getElementById("sales-date");
   const salesIncomingInput = document.getElementById("sales-item-incoming");
   if (salesDateInput && salesIncomingInput) {
-    const onSalesDateChange = () => {
+    const handleSalesDateChange = () => {
       salesIncomingInput.value = salesDateInput.value;
       salesCart.forEach(item => {
         item.incomingDate = salesDateInput.value;
@@ -3583,18 +3651,21 @@ document.addEventListener("DOMContentLoaded", () => {
         window.loadItemsFromExcel();
       }
     };
-    salesDateInput.addEventListener("input", onSalesDateChange);
-    salesDateInput.addEventListener("change", onSalesDateChange);
+    
+    salesDateInput.addEventListener("input", handleSalesDateChange);
+    salesDateInput.addEventListener("change", handleSalesDateChange);
   }
 
   // 매출처 변경 시 엑셀 발주 데이터 자동 연동
   const salesPartnerInput = document.getElementById("sales-partner");
   if (salesPartnerInput) {
-    salesPartnerInput.addEventListener("change", () => {
+    const handleSalesPartnerChange = () => {
       if (uploadedExcelRows && editingSalesId === null) {
         window.loadItemsFromExcel();
       }
-    });
+    };
+    salesPartnerInput.addEventListener("change", handleSalesPartnerChange);
+    salesPartnerInput.addEventListener("input", handleSalesPartnerChange);
   }
 
   // 수동 엑셀 데이터 불러오기 버튼 바인딩
@@ -3684,7 +3755,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
 
   // 폼 리셋 시 토글 스위치 상태 동기화 처리 및 부가세 상태 초기화
   const formSalesBill = document.getElementById("form-sales-bill");
@@ -3795,5 +3865,161 @@ document.addEventListener("DOMContentLoaded", () => {
       shouldPrintEstimate = true;
     });
   }
+
+  // --- 14. 실시간 클라우드 공유 및 인증 처리 ---
+  const authOverlay = document.getElementById("auth-overlay");
+  const formAuth = document.getElementById("form-auth");
+  const authErrorMsg = document.getElementById("auth-error-msg");
+  const authUsername = document.getElementById("auth-username");
+  const authPassword = document.getElementById("auth-password");
+  const authRegisterFields = document.getElementById("auth-register-fields");
+  const authCompanyName = document.getElementById("auth-company-name");
+  const authUserFullname = document.getElementById("auth-user-fullname");
+  const authSubtitle = document.getElementById("auth-subtitle");
+  const btnAuthSubmit = document.getElementById("btn-auth-submit");
+  const authModeMsg = document.getElementById("auth-mode-msg");
+  const btnAuthToggleMode = document.getElementById("btn-auth-toggle-mode");
+
+  let isRegisterMode = false;
+
+  if (btnAuthToggleMode) {
+    btnAuthToggleMode.addEventListener("click", () => {
+      isRegisterMode = !isRegisterMode;
+      authErrorMsg.style.display = "none";
+      
+      if (isRegisterMode) {
+        authRegisterFields.style.display = "flex";
+        authSubtitle.textContent = "실시간 클라우드 공유 회사 신규 개설";
+        btnAuthSubmit.textContent = "가입 및 개설 완료";
+        authModeMsg.textContent = "이미 계정이 있으신가요?";
+        btnAuthToggleMode.textContent = "기존 계정 로그인";
+        authCompanyName.required = true;
+        authUserFullname.required = true;
+      } else {
+        authRegisterFields.style.display = "none";
+        authSubtitle.textContent = "회사 통합 업무 재무 관리 시스템 로그인";
+        btnAuthSubmit.textContent = "로그인 완료";
+        authModeMsg.textContent = "아직 회사 계정이 없으신가요?";
+        btnAuthToggleMode.textContent = "신규 개설 및 가입";
+        authCompanyName.required = false;
+        authUserFullname.required = false;
+        authCompanyName.value = "";
+        authUserFullname.value = "";
+      }
+    });
+  }
+
+  if (formAuth) {
+    formAuth.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      authErrorMsg.style.display = "none";
+
+      const username = authUsername.value.trim();
+      const password = authPassword.value;
+
+      if (isRegisterMode) {
+        const companyName = authCompanyName.value.trim();
+        const name = authUserFullname.value.trim();
+
+        try {
+          const response = await fetch("/api/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, companyName, name })
+          });
+          const data = await response.json();
+          if (response.ok) {
+            alert("회원가입 및 회사 개설이 성공하였습니다. 로그인해 주세요!");
+            btnAuthToggleMode.click();
+          } else {
+            authErrorMsg.textContent = data.error || "회원가입에 실패했습니다.";
+            authErrorMsg.style.display = "block";
+          }
+        } catch (err) {
+          authErrorMsg.textContent = "네트워크 오류가 발생했습니다.";
+          authErrorMsg.style.display = "block";
+        }
+      } else {
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await response.json();
+          if (response.ok) {
+            localStorage.setItem("erp_jwt_token", data.token);
+            localStorage.setItem("erp_user_info", JSON.stringify(data.user));
+            
+            updateLoginStatusUI(data.user);
+            authOverlay.style.display = "none";
+            
+            await syncFromCloud();
+            alert(`${data.user.companyName}의 ERP 원장이 동기화되었습니다.`);
+          } else {
+            authErrorMsg.textContent = data.error || "로그인 정보가 올바르지 않습니다.";
+            authErrorMsg.style.display = "block";
+          }
+        } catch (err) {
+          authErrorMsg.textContent = "네트워크 오류가 발생했습니다.";
+          authErrorMsg.style.display = "block";
+        }
+      }
+    });
+  }
+
+  function updateLoginStatusUI(user) {
+    const userDisplay = document.getElementById("user-display-name");
+    if (userDisplay && user) {
+      userDisplay.textContent = `${user.companyName} [${user.name} 님]`;
+    }
+  }
+
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) {
+    btnLogout.addEventListener("click", () => {
+      if (confirm("로그아웃 하시겠습니까? 로컬 변경 사항 중 서버에 반영되지 않은 내역이 유실될 수 있습니다.")) {
+        localStorage.removeItem("erp_jwt_token");
+        localStorage.removeItem("erp_user_info");
+        location.reload();
+      }
+    });
+  }
+
+  async function checkAuth() {
+    const token = localStorage.getItem("erp_jwt_token");
+    if (!token) {
+      authOverlay.style.display = "flex";
+      return;
+    }
+    
+    try {
+      const response = await fetch("/api/auth/me", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        updateLoginStatusUI(data.user);
+        authOverlay.style.display = "none";
+        await syncFromCloud();
+      } else {
+        localStorage.removeItem("erp_jwt_token");
+        localStorage.removeItem("erp_user_info");
+        authOverlay.style.display = "flex";
+      }
+    } catch (err) {
+      console.warn("인증 확인 실패 (오프라인 모드 우선 작동):", err);
+      const userInfoStr = localStorage.getItem("erp_user_info");
+      if (userInfoStr) {
+        const user = JSON.parse(userInfoStr);
+        updateLoginStatusUI(user);
+        authOverlay.style.display = "none";
+      } else {
+        authOverlay.style.display = "flex";
+      }
+    }
+  }
+
+  checkAuth();
 
 });
