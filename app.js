@@ -133,6 +133,22 @@ if (!db.settings.hkF8) db.settings.hkF8 = "receivables";
 if (!db.settings.hkF9) db.settings.hkF9 = "excel-import";
 if (db.settings.printSealImage === undefined) db.settings.printSealImage = "";
 
+// 필수 샘플 거래처 및 품목 자동 병합 (엑셀 연동 테스트용 캐시 자가치유)
+if (db.partners) {
+  const hasNamho = db.partners.some(p => p.name.includes("남호초등학교"));
+  if (!hasNamho) {
+    db.partners.push({ code: "P005", name: "남호초등학교 (매출처)", owner: "홍교장", bizNo: "123-45-67890", address: "강원도 원주시", phone: "033-123-4567", type: "매출처" });
+  }
+}
+if (db.products) {
+  const hasPotato = db.products.some(p => p.name === "감자");
+  if (!hasPotato) {
+    db.products.push({ code: "PRD004", name: "감자", unit: "kg", origin: "국내산", purchasePrice: 1500, salesPrice: 2641, taxType: "면세", stock: 500 });
+    db.products.push({ code: "PRD005", name: "고추(청양고추)", unit: "kg", origin: "국내산", purchasePrice: 4000, salesPrice: 6163, taxType: "과세", stock: 300 });
+  }
+}
+localStorage.setItem("erp_db_pro", JSON.stringify(db));
+
 function saveDb() {
   localStorage.setItem("erp_db_pro", JSON.stringify(db));
   updateDashboard();
@@ -3660,6 +3676,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
 
   // 폼 리셋 시 토글 스위치 상태 동기화 처리 및 부가세 상태 초기화
   const formSalesBill = document.getElementById("form-sales-bill");
