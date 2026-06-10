@@ -228,8 +228,8 @@ input, select, textarea {
 }
 
 select option {
-  background-color: #0f172a;
-  color: #ffffff;
+  background-color: #ffffff;
+  color: #1e293b;
 }
 
 input:focus, select:focus, textarea:focus {
