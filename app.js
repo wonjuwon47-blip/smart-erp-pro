@@ -3201,8 +3201,10 @@ window.loadItemsFromExcel = function(force = false) {
   // 매출처명 정제 (선택지 괄호 꼬임 방지)
   const cleanPartnerName = targetPartner.replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
 
+  console.log("loadItemsFromExcel: Target Date:", targetDate, "Target Partner:", cleanPartnerName);
+
   // 매칭 행 필터링
-  const matchingRows = uploadedExcelRows.filter(row => {
+  const matchingRows = uploadedExcelRows.filter((row, idx) => {
     const partnerKeys = ['학교', '거래처', '거래처명', '납품처', '바이어', '매출처', '수신', '상호명'];
     const partnerVal = getExcelRowValue(row, partnerKeys) || "";
     const cleanRowPartner = String(partnerVal).replace(" (매출처)", "").replace(" (매입처)", "").split(" (")[0].trim();
@@ -3215,8 +3217,14 @@ window.loadItemsFromExcel = function(force = false) {
     const partnerMatches = cleanRowPartner.includes(cleanPartnerName) || cleanPartnerName.includes(cleanRowPartner);
     const dateMatches = formattedRowDate === targetDate;
 
+    if (idx < 5) {
+      console.log(`Excel Row ${idx} Debug: RowPartner: "${cleanRowPartner}" (matches "${cleanPartnerName}"? ${partnerMatches}), RowDate: "${formattedRowDate}" (matches "${targetDate}"? ${dateMatches})`);
+    }
+
     return partnerMatches && dateMatches;
   });
+
+  console.log("loadItemsFromExcel: Total Matching Rows found:", matchingRows.length);
 
   const statusEl = document.getElementById("excel-upload-status");
   if (matchingRows.length === 0) {
@@ -3292,7 +3300,7 @@ if (salesExcelFile) {
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(data, { type: 'array' });
         
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
