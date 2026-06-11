@@ -3980,35 +3980,63 @@ function processUploadedSchoolFiles() {
     summaryRows: summaryRows
   };
   
-  const orderSheetDateSelect = document.getElementById("order-sheet-date-select");
-  if (orderSheetDateSelect) {
-    const currentSelVal = orderSheetDateSelect.value;
-    orderSheetDateSelect.innerHTML = "<option value=''>-- 일자를 선택하세요 --</option>";
-    dates.forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d;
-      opt.textContent = d;
-      orderSheetDateSelect.appendChild(opt);
-    });
-    
-    if (dates.includes(currentSelVal)) {
-      orderSheetDateSelect.value = currentSelVal;
-    } else if (dates.length > 0) {
-      orderSheetDateSelect.value = dates[0];
-    }
-  }
+  window.lastUploadedOrderData = {
+    fileName: `${window.uploadedSchoolFiles.length}개 학교 통합`,
+    rawRows: mergedRows,
+    dates: dates,
+    summaryHeaders: summaryHeaders,
+    summaryRows: summaryRows
+  };
   
   renderOrderSheetData();
 }
 
-// --- 통합 발주표 대시보드 렌더링 ---
+// --- 통합 발주 상세 테이블 필터 상태 ---
+window.orderSheetFilters = {
+  date: null,
+  school: null,
+  product: null,
+  spec: null,
+  qty: null,
+  price: null,
+  amount: null,
+  status: null
+};
+window.currentFilteringColumn = "";
+
+// --- 필터링 상태 적용된 현재 활성 행 목록 반환 ---
+// --- 필터링 상태 적용된 현재 활성 행 목록 반환 ---
+function getFilteredOrderRows() {
+  if (!window.lastUploadedOrderData) return [];
+  
+  return window.lastUploadedOrderData.rawRows.filter(row => {
+    const amt = Math.round(row.qty * row.price);
+    const st = row.status || "대기";
+    
+    const match = (colKey, val) => {
+      const filterVals = window.orderSheetFilters[colKey];
+      if (filterVals === null || filterVals === undefined) return true;
+      return filterVals.includes(String(val).trim());
+    };
+    
+    return (
+      match('date', row.date) &&
+      match('school', row.school) &&
+      match('product', row.product) &&
+      match('spec', row.spec) &&
+      match('qty', row.qty) &&
+      match('price', row.price) &&
+      match('amount', amt) &&
+      match('status', st)
+    );
+  });
+}
+
+// --- 통합 발주표 데이터 테이블 렌더링 ---
 function renderOrderSheetData() {
   const container = document.getElementById("order-sheet-data-container");
-  const selectEl = document.getElementById("order-sheet-date-select");
-  const pivotTable = document.getElementById("order-sheet-pivot-table");
-  const pivotInfo = document.getElementById("order-sheet-pivot-info");
-  const summaryHeaders = document.getElementById("order-sheet-summary-headers");
-  const summaryRows = document.getElementById("order-sheet-summary-rows");
+  const tableRows = document.getElementById("order-sheet-table-rows");
+  const tableInfo = document.getElementById("order-sheet-table-info");
   
   if (!window.lastUploadedOrderData) {
     if (container) container.style.display = "none";
@@ -4017,157 +4045,270 @@ function renderOrderSheetData() {
   
   if (container) container.style.display = "block";
   
-  const selectedDate = selectEl ? selectEl.value : "";
-  if (!selectedDate) {
-    if (pivotTable) pivotTable.innerHTML = "<tr><td style='padding: 20px; color: rgba(255,255,255,0.5);'>납품 일자를 선택해 주세요.</td></tr>";
-    if (pivotInfo) pivotInfo.textContent = "학교 수: 0개 | 품목 수: 0개";
-    return;
+  const filteredRows = getFilteredOrderRows();
+  
+  const totalLoad = window.lastUploadedOrderData.rawRows.length;
+  const totalFiltered = filteredRows.length;
+  const grandTotalAmount = filteredRows.reduce((sum, r) => sum + Math.round(r.qty * r.price), 0);
+  
+  if (tableInfo) {
+    tableInfo.innerHTML = `로드 수: <strong>${totalLoad}</strong>행 | 필터링: <strong>${totalFiltered}</strong>행 | 합계 금액: <strong>${grandTotalAmount.toLocaleString()}</strong>원`;
   }
   
-  // 1. 해당 날짜 데이터 필터링
-  const dailyRows = window.lastUploadedOrderData.rawRows.filter(r => r.date === selectedDate);
+  let html = "";
+  if (filteredRows.length === 0) {
+    html = `<tr><td colspan="8" style="padding: 30px; color: rgba(255,255,255,0.4);">조건을 만족하는 발주 내역이 없습니다.</td></tr>`;
+  } else {
+    filteredRows.forEach(r => {
+      const amt = Math.round(r.qty * r.price);
+      const st = r.status || "대기";
+      const badgeStyle = st === "이관 완료" 
+        ? "background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);"
+        : "background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3);";
+      
+      html += `<tr>`;
+      html += `<td>${escapeHtml(r.date)}</td>`;
+      html += `<td style="text-align: left; font-weight: 500;">${escapeHtml(r.school)}</td>`;
+      html += `<td style="text-align: left; font-weight: 600;">${escapeHtml(r.product)}</td>`;
+      html += `<td style="color: rgba(255,255,255,0.6);">${escapeHtml(r.spec)}</td>`;
+      html += `<td style="text-align: right; font-weight: bold;">${r.qty % 1 === 0 ? r.qty.toLocaleString() : r.qty.toFixed(2)}</td>`;
+      html += `<td style="text-align: right; color: rgba(255,255,255,0.7);">${r.price.toLocaleString()}</td>`;
+      html += `<td style="text-align: right; font-weight: bold; color: var(--primary-color);">${amt.toLocaleString()}</td>`;
+      html += `<td><span class="badge" style="padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; ${badgeStyle}">${st}</span></td>`;
+      html += `</tr>`;
+    });
+  }
   
-  // 2. 해당 날짜의 유니크 학교 및 품목 추출
-  const schools = [...new Set(dailyRows.map(r => r.school))].sort();
-  // 품목 식별을 위해 품목명 + 규격/단위 조합
-  const productsMap = {};
-  dailyRows.forEach(r => {
-    const key = `${r.product}||${r.spec || ""}`;
-    if (!productsMap[key]) {
-      productsMap[key] = {
-        product: r.product,
-        spec: r.spec || "",
-        key: key
-      };
+  if (tableRows) tableRows.innerHTML = html;
+  
+  const headers = document.querySelectorAll("#order-sheet-data-table th[data-col]");
+  headers.forEach(th => {
+    const col = th.getAttribute("data-col");
+    if (window.orderSheetFilters[col] !== null && window.orderSheetFilters[col] !== undefined) {
+      th.classList.add("filter-active");
+    } else {
+      th.classList.remove("filter-active");
     }
   });
-  const products = Object.values(productsMap).sort((a, b) => a.product.localeCompare(b.product));
+}
+
+// --- 헤더 필터 시스템 셋업 및 동작 ---
+function setupOrderSheetFilters() {
+  const table = document.getElementById("order-sheet-data-table");
+  const popover = document.getElementById("order-sheet-filter-popover");
+  if (!table || !popover) return;
   
-  if (pivotInfo) {
-    pivotInfo.textContent = `학교 수: ${schools.length}개 | 품목 수: ${products.length}개`;
+  const headers = table.querySelectorAll("th[data-col]");
+  headers.forEach(th => {
+    th.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const col = th.getAttribute("data-col");
+      window.currentFilteringColumn = col;
+      
+      const titleEl = document.getElementById("filter-popover-title");
+      if (titleEl) {
+        const colNames = {
+          date: "납품일자",
+          school: "학교명",
+          product: "품목명",
+          spec: "규격/단위",
+          qty: "수량",
+          price: "단가(원)",
+          amount: "금액(원)",
+          status: "상태"
+        };
+        titleEl.textContent = `${colNames[col] || col} 필터`;
+      }
+      
+      const allRows = window.lastUploadedOrderData ? window.lastUploadedOrderData.rawRows : [];
+      const uniqueVals = new Set();
+      allRows.forEach(row => {
+        let val = "";
+        if (col === "amount") {
+          val = String(Math.round(row.qty * row.price));
+        } else if (col === "status") {
+          val = row.status || "대기";
+        } else {
+          val = String(row[col] || "");
+        }
+        uniqueVals.add(val.trim());
+      });
+      
+      const sortedVals = [...uniqueVals].sort((a, b) => {
+        if (!isNaN(a) && !isNaN(b)) return Number(a) - Number(b);
+        return a.localeCompare(b);
+      });
+      
+      const optionsContainer = document.getElementById("filter-popover-options");
+      if (optionsContainer) {
+        optionsContainer.innerHTML = "";
+        const activeFilters = window.orderSheetFilters[col];
+        
+        sortedVals.forEach(val => {
+          const isChecked = (activeFilters === null || activeFilters === undefined) ? true : activeFilters.includes(val);
+          const label = document.createElement("label");
+          
+          let displayVal = val;
+          if (col === "amount" || col === "price") {
+            displayVal = Number(val).toLocaleString() + "원";
+          }
+          
+          label.innerHTML = `
+            <input type="checkbox" value="${escapeHtml(val)}" ${isChecked ? "checked" : ""}>
+            <span>${escapeHtml(displayVal)}</span>
+          `;
+          optionsContainer.appendChild(label);
+        });
+      }
+      
+      // 검색 입력창 리셋 및 실시간 항목 매칭 연결
+      const searchInput = document.getElementById("filter-popover-search");
+      if (searchInput) {
+        searchInput.value = "";
+        searchInput.oninput = (e) => {
+          const text = e.target.value.toLowerCase().trim();
+          const labels = optionsContainer.querySelectorAll("label");
+          labels.forEach(label => {
+            const span = label.querySelector("span");
+            if (span) {
+              const labelText = span.textContent.toLowerCase();
+              if (labelText.includes(text)) {
+                label.style.display = "flex";
+              } else {
+                label.style.display = "none";
+              }
+            }
+          });
+        };
+      }
+      
+      const rect = th.getBoundingClientRect();
+      const parentContainer = document.getElementById("order-sheet-data-container");
+      const parentRect = parentContainer.getBoundingClientRect();
+      
+      let leftPos = rect.left - parentRect.left;
+      const topPos = rect.bottom - parentRect.top;
+      
+      // 가로축 화면 밖으로 탈출 방지용 오프셋 보정
+      const popoverWidth = 220;
+      if (leftPos + popoverWidth > parentRect.width) {
+        leftPos = rect.right - parentRect.left - popoverWidth;
+      }
+      if (leftPos < 0) leftPos = 0;
+      
+      popover.style.left = `${leftPos}px`;
+      popover.style.top = `${topPos}px`;
+      popover.style.display = "block";
+    });
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (popover.style.display === "block" && !popover.contains(e.target)) {
+      popover.style.display = "none";
+    }
+  });
+  
+  const btnApply = document.getElementById("btn-filter-apply");
+  if (btnApply) {
+    btnApply.addEventListener("click", () => {
+      const col = window.currentFilteringColumn;
+      const optionsContainer = document.getElementById("filter-popover-options");
+      if (optionsContainer) {
+        const checkedBoxes = optionsContainer.querySelectorAll("input[type='checkbox']:checked");
+        const allBoxes = optionsContainer.querySelectorAll("input[type='checkbox']");
+        
+        if (checkedBoxes.length === allBoxes.length) {
+          window.orderSheetFilters[col] = null;
+        } else {
+          // 체크된 항목 리스트 수집 (아무것도 없으면 빈 배열로 지정해 모두 미매칭)
+          window.orderSheetFilters[col] = Array.from(checkedBoxes).map(cb => cb.value);
+        }
+      }
+      popover.style.display = "none";
+      renderOrderSheetData();
+    });
   }
   
-  // 3. 피벗 테이블 생성
-  let html = "";
+  const btnCancel = document.getElementById("btn-filter-cancel");
+  if (btnCancel) {
+    btnCancel.addEventListener("click", () => {
+      popover.style.display = "none";
+    });
+  }
   
-  // 3.1 헤더 생성 (품목, 규격, ...학교들, 합계)
-  html += "<thead><tr>";
-  html += "<th style='position: sticky; left: 0; background: #1a1a24; z-index: 10;'>품목명</th>";
-  html += "<th style='position: sticky; left: 120px; background: #1a1a24; z-index: 10; border-right: 2px solid rgba(255,255,255,0.15);'>규격/단위</th>";
-  schools.forEach(sch => {
-    html += `<th>${escapeHtml(sch)}</th>`;
-  });
-  html += "<th style='font-weight: bold; color: var(--primary-color); background: rgba(167, 139, 250, 0.05);'>합계수량</th>";
-  html += "</tr></thead>";
+  const btnClear = document.getElementById("btn-filter-clear-column");
+  if (btnClear) {
+    btnClear.addEventListener("click", () => {
+      window.orderSheetFilters[window.currentFilteringColumn] = null;
+      popover.style.display = "none";
+      renderOrderSheetData();
+    });
+  }
   
-  // 3.2 데이터 행 생성
-  html += "<tbody>";
-  const schoolTotalQty = {}; // 학교별 수량 합계
-  schools.forEach(sch => { schoolTotalQty[sch] = 0; });
-  let grandTotalQty = 0;
-  
-  products.forEach(p => {
-    html += "<tr>";
-    html += `<td style='position: sticky; left: 0; background: #1f1f2e; text-align: left; font-weight: 500; font-size: 0.9rem;'>${escapeHtml(p.product)}</td>`;
-    html += `<td style='position: sticky; left: 120px; background: #1f1f2e; text-align: center; border-right: 2px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); font-size: 0.85rem;'>${escapeHtml(p.spec)}</td>`;
-    
-    let productRowTotal = 0;
-    schools.forEach(sch => {
-      const match = dailyRows.find(r => r.school === sch && r.product === p.product && (r.spec || "") === p.spec);
-      const qty = match ? match.qty : 0;
-      
-      if (qty > 0) {
-        html += `<td style='font-weight: 600; color: #fff;'>${qty % 1 === 0 ? qty : qty.toFixed(2)}</td>`;
-        schoolTotalQty[sch] += qty;
-        productRowTotal += qty;
-      } else {
-        html += "<td style='color: rgba(255,255,255,0.15);'>-</td>";
+  const btnSelectAll = document.getElementById("btn-filter-select-all");
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener("click", () => {
+      const optionsContainer = document.getElementById("filter-popover-options");
+      if (optionsContainer) {
+        const checkboxes = optionsContainer.querySelectorAll("input[type='checkbox']");
+        checkboxes.forEach(cb => { cb.checked = true; });
       }
     });
-    
-    grandTotalQty += productRowTotal;
-    html += `<td style='font-weight: bold; color: var(--primary-color); background: rgba(167, 139, 250, 0.05);'>${productRowTotal % 1 === 0 ? productRowTotal : productRowTotal.toFixed(2)}</td>`;
-    html += "</tr>";
-  });
+  }
   
-  // 3.3 합계 행 생성 (푸터)
-  html += "<tr style='background: rgba(255,255,255,0.02); font-weight: bold; border-top: 2px solid rgba(255,255,255,0.15);'>";
-  html += "<td colspan='2' style='position: sticky; left: 0; background: #1f1f2e; text-align: center; border-right: 2px solid rgba(255,255,255,0.15); color: var(--primary-color);'>합계 수량</td>";
-  schools.forEach(sch => {
-    const total = schoolTotalQty[sch];
-    html += `<td style='color: var(--primary-color);'>${total % 1 === 0 ? total : total.toFixed(2)}</td>`;
-  });
-  html += `<td style='color: var(--primary-color); background: rgba(167, 139, 250, 0.1); font-size: 1.05rem;'>${grandTotalQty % 1 === 0 ? grandTotalQty : grandTotalQty.toFixed(2)}</td>`;
-  html += "</tr>";
-  html += "</tbody>";
-  
-  if (pivotTable) pivotTable.innerHTML = html;
-  
-  // 4. 월간 품목별 요약 테이블 렌더링
-  if (window.lastUploadedOrderData.summaryHeaders && window.lastUploadedOrderData.summaryRows) {
-    if (summaryHeaders && summaryRows) {
-      let shHtml = "";
-      window.lastUploadedOrderData.summaryHeaders.forEach(h => {
-        shHtml += `<th>${escapeHtml(h)}</th>`;
-      });
-      summaryHeaders.innerHTML = shHtml;
-      
-      let srHtml = "";
-      window.lastUploadedOrderData.summaryRows.forEach(r => {
-        srHtml += "<tr>";
-        window.lastUploadedOrderData.summaryHeaders.forEach(h => {
-          const val = r[h];
-          if (typeof val === 'number') {
-            srHtml += `<td>${val % 1 === 0 ? val : val.toFixed(2)}</td>`;
-          } else {
-            srHtml += `<td>${escapeHtml(val || "-")}</td>`;
-          }
-        });
-        srHtml += "</tr>";
-      });
-      summaryRows.innerHTML = srHtml;
-    }
+  const btnDeselectAll = document.getElementById("btn-filter-deselect-all");
+  if (btnDeselectAll) {
+    btnDeselectAll.addEventListener("click", () => {
+      const optionsContainer = document.getElementById("filter-popover-options");
+      if (optionsContainer) {
+        const checkboxes = optionsContainer.querySelectorAll("input[type='checkbox']");
+        checkboxes.forEach(cb => { cb.checked = false; });
+      }
+    });
   }
 }
 
-// --- 발주 데이터를 매출 전표로 일괄 등록 및 재고 차감 ---
+// --- 필터링된 발주 상세 내역 기반 매출 전표 일괄 생성 ---
 function importOrderSheetSales() {
-  const selectEl = document.getElementById("order-sheet-date-select");
-  if (!window.lastUploadedOrderData || !selectEl) {
+  if (!window.lastUploadedOrderData) {
     alert("업로드된 발주 데이터가 없습니다.");
     return;
   }
   
-  const selectedDate = selectEl.value;
-  if (!selectedDate) {
-    alert("매출 등록할 납품 일자를 선택해 주세요.");
+  const visibleRows = getFilteredOrderRows();
+  const activeRows = visibleRows.filter(r => (r.status || "대기") === "대기");
+  
+  if (activeRows.length === 0) {
+    alert("이관 가능한 '대기' 상태의 발주 내역이 없습니다.\n이미 매출이 등록되었거나 필터링 조건에 대기 중인 항목이 없는지 확인해 주세요.");
     return;
   }
   
-  const dailyRows = window.lastUploadedOrderData.rawRows.filter(r => r.date === selectedDate);
-  if (dailyRows.length === 0) {
-    alert("해당 날짜에 등록할 발주 내역이 없습니다.");
+  if (!confirm(`현재 필터링된 대기 중인 발주 내역 ${activeRows.length}행을 매출 전표로 일괄 등록하시겠습니까?\n등록 시 날짜 및 학교별로 매출 전표가 자동 묶여 생성되며 재고가 차감됩니다.`)) {
     return;
   }
   
-  if (!confirm(`${selectedDate} 일자 발주 내역 ${dailyRows.length}행을 매출 전표로 일괄 등록하시겠습니까?\n등록 시 거래처/제품 자동 생성 및 재고 차감이 연동되어 처리됩니다.`)) {
-    return;
-  }
-  
-  const schoolGroups = {};
-  dailyRows.forEach(r => {
-    if (!schoolGroups[r.school]) {
-      schoolGroups[r.school] = [];
+  const groupedOrders = {};
+  activeRows.forEach(r => {
+    const key = `${r.date}||${r.school}`;
+    if (!groupedOrders[key]) {
+      groupedOrders[key] = {
+        date: r.date,
+        school: r.school,
+        items: []
+      };
     }
-    schoolGroups[r.school].push(r);
+    groupedOrders[key].items.push(r);
   });
   
   let salesCreatedCount = 0;
   let newPartnersCreated = 0;
   let newProductsCreated = 0;
   
-  for (const schoolName in schoolGroups) {
-    const items = schoolGroups[schoolName];
+  for (const groupKey in groupedOrders) {
+    const group = groupedOrders[groupKey];
+    const orderDate = group.date;
+    const schoolName = group.school;
+    const items = group.items;
     
     let partnerObj = db.partners.find(p => p.name === schoolName);
     if (!partnerObj) {
@@ -4230,7 +4371,7 @@ function importOrderSheetSales() {
         name: productObj.name,
         unit: productObj.unit,
         origin: productObj.origin,
-        incomingDate: selectedDate,
+        incomingDate: orderDate,
         amount: amount,
         total: total
       });
@@ -4243,7 +4384,7 @@ function importOrderSheetSales() {
     
     const newSale = {
       id: saleId,
-      date: selectedDate,
+      date: orderDate,
       partner: schoolName,
       partnerId: partnerObj.id,
       items: cartItems,
@@ -4262,9 +4403,14 @@ function importOrderSheetSales() {
     salesCreatedCount++;
   }
   
-  saveDb();
+  activeRows.forEach(row => {
+    row.status = "이관 완료";
+  });
   
-  let msg = `성공적으로 ${selectedDate} 일자의 매출 전표 ${salesCreatedCount}건이 등록되었습니다.\n`;
+  saveDb();
+  renderOrderSheetData();
+  
+  let msg = `성공적으로 선택된 발주 내역을 통해 매출 전표 ${salesCreatedCount}건이 등록되었습니다.\n`;
   if (newPartnersCreated > 0) msg += `- 신규 학교(매출처) ${newPartnersCreated}곳 자동 등록됨\n`;
   if (newProductsCreated > 0) msg += `- 신규 품목(재고) ${newProductsCreated}개 자동 등록됨\n`;
   msg += `- 각 출고량만큼 상품 재고량이 자동차감 처리되었습니다.`;
@@ -4327,144 +4473,272 @@ document.addEventListener("DOMContentLoaded", () => {
       
       let successCount = 0;
       let errorCount = 0;
+      let isIntegratedLoaded = false;
+      
+      // 엑셀 날짜 일련번호 변환 함수
+      const formatExcelDate = (excelDate) => {
+        if (!excelDate) return "";
+        if (typeof excelDate === 'number') {
+          // 엑셀 1900년 윤년 버그 보정을 위해 25569를 적용하여 자바스크립트 Date로 변환
+          const date = new Date((excelDate - 25569) * 86400 * 1000);
+          const tzOffset = date.getTimezoneOffset() * 60000;
+          const localDate = new Date(date.getTime() + tzOffset);
+          const y = localDate.getFullYear();
+          const m = String(localDate.getMonth() + 1).padStart(2, '0');
+          const d = String(localDate.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        let str = String(excelDate).trim();
+        if (str.match(/^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/)) {
+          return str.replace(/[./]/g, '-');
+        }
+        const shortMatch = str.match(/^(\d{2})[-./](\d{1,2})[-./](\d{1,2})$/);
+        if (shortMatch) {
+          return `20${shortMatch[1]}-${shortMatch[2].padStart(2, '0')}-${shortMatch[3].padStart(2, '0')}`;
+        }
+        return str;
+      };
       
       for (const file of files) {
         try {
           const fileData = await readFileAsArrayBuffer(file);
           const workbook = XLSX.read(fileData, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          let isIntegrated = false;
+          let targetSheetName = workbook.SheetNames[0];
+          
+          // '전체 데이터' 시트가 존재하면 우선적으로 통합 발주표로 판단
+          if (workbook.SheetNames.includes("전체 데이터")) {
+            isIntegrated = true;
+            targetSheetName = "전체 데이터";
+          } else {
+            // 첫 시트의 상단 데이터 검사하여 통합 발주표 여부 확인
+            const tempSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const tempRows = XLSX.utils.sheet_to_json(tempSheet, { header: 1, range: 0 });
+            for (let r = 0; r < Math.min(10, tempRows.length); r++) {
+              const row = tempRows[r] || [];
+              const rowStr = row.map(v => String(v || '')).join(' ');
+              if (rowStr.includes("납품일자") && rowStr.includes("학교") && rowStr.includes("품목")) {
+                isIntegrated = true;
+                break;
+              }
+            }
+          }
+          
+          const sheet = workbook.Sheets[targetSheetName];
           const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
           
-          let year = new Date().getFullYear();
-          let mealType = "중식";
-          let schoolName = "";
-          
-          for (let r = 0; r < Math.min(10, rawData.length); r++) {
-            const row = rawData[r] || [];
-            for (let c = 0; c < row.length; c++) {
-              const val = String(row[c] || '').trim();
-              if (val.includes('기간 :') || val.includes('기간:')) {
-                const yearMatch = val.match(/\b(20\d{2})\b/);
-                const mealMatch = val.match(/\((조식|중식|석식)\)/);
-                if (yearMatch) year = parseInt(yearMatch[1]);
-                if (mealMatch) mealType = mealMatch[1];
+          if (isIntegrated) {
+            // --- 통합 발주서 파싱 로직 ---
+            let headerRowIdx = -1;
+            for (let r = 0; r < Math.min(15, rawData.length); r++) {
+              const row = rawData[r] || [];
+              const rowStr = row.map(v => String(v || '')).join(' ');
+              if (rowStr.includes("납품일자") && rowStr.includes("학교") && rowStr.includes("품목")) {
+                headerRowIdx = r;
+                break;
               }
-              if (val.includes('[발송]')) {
-                const schoolMatch = val.match(/\[발송\]\s*:\s*([^\s]+)/);
-                if (schoolMatch) {
-                  schoolName = schoolMatch[1].replace(/초등학교|중학교|고등학교/g, m => m).trim();
-                  if (schoolName.includes('동해삼육고등학교')) {
-                    schoolName = `${schoolName}(${mealType})`;
+            }
+            
+            if (headerRowIdx === -1) {
+              throw new Error("통합 발주서 헤더(납품일자, 학교, 품목 등)를 찾을 수 없습니다.");
+            }
+            
+            const headerRow = rawData[headerRowIdx];
+            const dateColIdx = headerRow.findIndex(h => String(h || '').trim() === '납품일자');
+            const schoolColIdx = headerRow.findIndex(h => String(h || '').trim() === '학교');
+            const prodColIdx = headerRow.findIndex(h => String(h || '').trim() === '품목');
+            const specColIdx = headerRow.findIndex(h => String(h || '').trim() === '규격/단위' || String(h || '').trim() === '규격');
+            const qtyColIdx = headerRow.findIndex(h => String(h || '').trim() === '수량');
+            const priceColIdx = headerRow.findIndex(h => String(h || '').trim().startsWith('단가'));
+            const statusColIdx = headerRow.findIndex(h => String(h || '').trim() === '상태');
+            
+            const parsedRows = [];
+            for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+              const row = rawData[r] || [];
+              if (row.length === 0) continue;
+              
+              const rawDate = row[dateColIdx];
+              const school = String(row[schoolColIdx] || '').trim();
+              const productName = String(row[prodColIdx] || '').trim();
+              
+              if (!rawDate || !school || !productName) continue;
+              if (productName.includes("합계") || productName.includes("【합 계】") || productName === "식품명") continue;
+              
+              const dateStr = formatExcelDate(rawDate);
+              let spec = specColIdx !== -1 ? String(row[specColIdx] || '').trim() : '';
+              spec = sanitizeExcelUnitAndName(spec);
+              
+              const qty = parseFloat(String(row[qtyColIdx] || '0').replace(/,/g, ''));
+              let price = parseFloat(String(row[priceColIdx] || '0').replace(/,/g, ''));
+              
+              if (isNaN(qty) || qty <= 0) continue;
+              
+              if (isNaN(price) || price === 0) {
+                const productObj = db.products.find(p => p.name === productName);
+                if (productObj) {
+                  price = Number(productObj.salesPrice) || 0;
+                } else {
+                  price = 0;
+                }
+              }
+              
+              const status = statusColIdx !== -1 && row[statusColIdx] ? String(row[statusColIdx]).trim() : "대기";
+              
+              parsedRows.push({
+                date: dateStr,
+                school: school,
+                product: productName,
+                spec: spec,
+                qty: qty,
+                price: price,
+                status: status
+              });
+            }
+            
+            // 통합 발주서를 로드한 경우, 기존의 개별 학교 목록을 리셋하고 이 통합 발주서만 단독 등록
+            window.uploadedSchoolFiles = [{
+              fileName: file.name,
+              school: "전체 통합 발주",
+              rows: parsedRows
+            }];
+            successCount++;
+            isIntegratedLoaded = true;
+            break; // 통합 발주서의 경우 루프 종료
+          } else {
+            // --- 개별 학교 발주서 파싱 로직 ---
+            let year = new Date().getFullYear();
+            let mealType = "중식";
+            let schoolName = "";
+            
+            for (let r = 0; r < Math.min(10, rawData.length); r++) {
+              const row = rawData[r] || [];
+              for (let c = 0; c < row.length; c++) {
+                const val = String(row[c] || '').trim();
+                if (val.includes('기간 :') || val.includes('기간:')) {
+                  const yearMatch = val.match(/\b(20\d{2})\b/);
+                  const mealMatch = val.match(/\((조식|중식|석식)\)/);
+                  if (yearMatch) year = parseInt(yearMatch[1]);
+                  if (mealMatch) mealType = mealMatch[1];
+                }
+                if (val.includes('[발송]')) {
+                  const schoolMatch = val.match(/\[발송\]\s*:\s*([^\s]+)/);
+                  if (schoolMatch) {
+                    schoolName = schoolMatch[1].replace(/초등학교|중학교|고등학교/g, m => m).trim();
+                    if (schoolName.includes('동해삼육고등학교')) {
+                      schoolName = `${schoolName}(${mealType})`;
+                    }
                   }
                 }
               }
             }
-          }
-          
-          if (!schoolName) {
-            const fileMatch = file.name.match(/\(([^)]+)\)/);
-            if (fileMatch) {
-              const name = fileMatch[1].trim();
-              if (name.includes('임원초')) schoolName = '임원초등학교';
-              else if (name.includes('오저')) schoolName = '오저초등학교';
-              else if (name.includes('삼척중')) schoolName = '삼척중학교';
-              else schoolName = name;
-            } else {
-              schoolName = file.name.replace(/\.xlsx?$/, '').trim();
-            }
-          }
-          
-          let headerRowIdx = -1;
-          for (let r = 0; r < Math.min(15, rawData.length); r++) {
-            const row = rawData[r] || [];
-            if (row.includes('식품명') || row.includes('품목명') || row.includes('품목')) {
-              headerRowIdx = r;
-              break;
-            }
-          }
-          
-          if (headerRowIdx === -1) {
-            throw new Error("식품명 헤더 행을 찾을 수 없습니다.");
-          }
-          
-          const headerRow = rawData[headerRowIdx];
-          const prodNameColIdx = headerRow.findIndex(h => h === '식품명' || h === '품목명' || h === '품목');
-          const specColIdx = headerRow.findIndex(h => h === '속성설명' || h === '규격/단위' || h === '규격');
-          const unitColIdx = headerRow.findIndex(h => h === '단위');
-          
-          const dateCols = [];
-          headerRow.forEach((val, cIdx) => {
-            if (!val) return;
-            const strVal = String(val).trim();
-            const dateMatch = strVal.match(/^(\d{1,2})\.(\d{1,2})$/);
-            if (dateMatch) {
-              const m = dateMatch[1].padStart(2, '0');
-              const d = dateMatch[2].padStart(2, '0');
-              const dateStr = `${year}-${m}-${d}`;
-              dateCols.push({ index: cIdx, dateStr: dateStr });
-            }
-          });
-          
-          if (dateCols.length === 0) {
-            throw new Error("유효한 납품일자 열(MM.DD)을 찾을 수 없습니다.");
-          }
-          
-          const parsedRows = [];
-          for (let r = headerRowIdx + 1; r < rawData.length; r++) {
-            const row = rawData[r] || [];
-            const productName = String(row[prodNameColIdx] || '').trim();
-            if (!productName || productName.includes('【합계】') || productName.includes('합계') || productName === 'NO' || productName === '식품명') {
-              continue;
+            
+            if (!schoolName) {
+              const fileMatch = file.name.match(/\(([^)]+)\)/);
+              if (fileMatch) {
+                const name = fileMatch[1].trim();
+                if (name.includes('임원초')) schoolName = '임원초등학교';
+                else if (name.includes('오저')) schoolName = '오저초등학교';
+                else if (name.includes('삼척중')) schoolName = '삼척중학교';
+                else schoolName = name;
+              } else {
+                schoolName = file.name.replace(/\.xlsx?$/, '').trim();
+              }
             }
             
-            let spec = '';
-            if (specColIdx !== -1) spec = String(row[specColIdx] || '').trim();
-            if (!spec && unitColIdx !== -1) spec = String(row[unitColIdx] || '').trim();
-            spec = sanitizeExcelUnitAndName(spec);
+            let headerRowIdx = -1;
+            for (let r = 0; r < Math.min(15, rawData.length); r++) {
+              const row = rawData[r] || [];
+              if (row.includes('식품명') || row.includes('품목명') || row.includes('품목')) {
+                headerRowIdx = r;
+                break;
+              }
+            }
             
-            dateCols.forEach(col => {
-              const val = row[col.index];
-              if (val === null || val === undefined || val === '') return;
-              
-              const valStr = String(val).trim();
-              if (valStr === '취소' || valStr === '-') return;
-              
-              const qty = parseFloat(valStr);
-              if (qty > 0) {
-                let productObj = db.products.find(p => p.name === productName);
-                let price = 0;
-                if (productObj) {
-                  price = Number(productObj.salesPrice) || 0;
-                }
-                
-                parsedRows.push({
-                  date: col.dateStr,
-                  school: schoolName,
-                  product: productName,
-                  spec: spec,
-                  qty: qty,
-                  price: price
-                });
+            if (headerRowIdx === -1) {
+              throw new Error("식품명 헤더 행을 찾을 수 없습니다.");
+            }
+            
+            const headerRow = rawData[headerRowIdx];
+            const prodNameColIdx = headerRow.findIndex(h => h === '식품명' || h === '품목명' || h === '품목');
+            const specColIdx = headerRow.findIndex(h => h === '속성설명' || h === '규격/단위' || h === '규격');
+            const unitColIdx = headerRow.findIndex(h => h === '단위');
+            
+            const dateCols = [];
+            headerRow.forEach((val, cIdx) => {
+              if (!val) return;
+              const strVal = String(val).trim();
+              const dateMatch = strVal.match(/^(\d{1,2})\.(\d{1,2})$/);
+              if (dateMatch) {
+                const m = dateMatch[1].padStart(2, '0');
+                const d = dateMatch[2].padStart(2, '0');
+                const dateStr = `${year}-${m}-${d}`;
+                dateCols.push({ index: cIdx, dateStr: dateStr });
               }
             });
+            
+            if (dateCols.length === 0) {
+              throw new Error("유효한 납품일자 열(MM.DD)을 찾을 수 없습니다.");
+            }
+            
+            const parsedRows = [];
+            for (let r = headerRowIdx + 1; r < rawData.length; r++) {
+              const row = rawData[r] || [];
+              const productName = String(row[prodNameColIdx] || '').trim();
+              if (!productName || productName.includes('【합계】') || productName.includes('합계') || productName === 'NO' || productName === '식품명') {
+                continue;
+              }
+              
+              let spec = '';
+              if (specColIdx !== -1) spec = String(row[specColIdx] || '').trim();
+              if (!spec && unitColIdx !== -1) spec = String(row[unitColIdx] || '').trim();
+              spec = sanitizeExcelUnitAndName(spec);
+              
+              dateCols.forEach(col => {
+                const val = row[col.index];
+                if (val === null || val === undefined || val === '') return;
+                
+                const valStr = String(val).trim();
+                if (valStr === '취소' || valStr === '-') return;
+                
+                const qty = parseFloat(valStr);
+                if (qty > 0) {
+                  let productObj = db.products.find(p => p.name === productName);
+                  let price = 0;
+                  if (productObj) {
+                    price = Number(productObj.salesPrice) || 0;
+                  }
+                  
+                  parsedRows.push({
+                    date: col.dateStr,
+                    school: schoolName,
+                    product: productName,
+                    spec: spec,
+                    qty: qty,
+                    price: price,
+                    status: "대기"
+                  });
+                }
+              });
+            }
+            
+            // 기존 개별 학교 파일 중 같은 파일명이 있으면 교체, 없으면 추가
+            const dupIdx = window.uploadedSchoolFiles.findIndex(f => f.fileName === file.name);
+            if (dupIdx !== -1) {
+              window.uploadedSchoolFiles[dupIdx] = {
+                fileName: file.name,
+                school: schoolName,
+                rows: parsedRows
+              };
+            } else {
+              window.uploadedSchoolFiles.push({
+                fileName: file.name,
+                school: schoolName,
+                rows: parsedRows
+              });
+            }
+            successCount++;
           }
-          
-          const dupIdx = window.uploadedSchoolFiles.findIndex(f => f.fileName === file.name);
-          if (dupIdx !== -1) {
-            window.uploadedSchoolFiles[dupIdx] = {
-              fileName: file.name,
-              school: schoolName,
-              rows: parsedRows
-            };
-          } else {
-            window.uploadedSchoolFiles.push({
-              fileName: file.name,
-              school: schoolName,
-              rows: parsedRows
-            });
-          }
-          
-          successCount++;
         } catch (err) {
           console.error(`Error parsing file ${file.name}:`, err);
           errorCount++;
@@ -4478,17 +4752,15 @@ document.addEventListener("DOMContentLoaded", () => {
         pText.textContent = `학교별 발주서 파일들(0601농수산(오저).xlsx 등)을 여기에 여러 개 드래그하거나 클릭하여 다중 선택하세요.`;
       }
       
-      let alertMsg = `발주서 파일 파싱 완료:\n- 성공: ${successCount}건`;
+      let alertMsg = isIntegratedLoaded 
+        ? `통합 발주 상세 내역 엑셀 파일이 성공적으로 로드되었습니다.`
+        : `발주서 파일 파싱 완료:\n- 성공: ${successCount}건`;
       if (errorCount > 0) alertMsg += `\n- 실패: ${errorCount}건 (상세 내용은 개발자 도구 콘솔을 확인해 주세요)`;
       alert(alertMsg);
     });
   }
   
-  if (orderSheetDateSelect) {
-    orderSheetDateSelect.addEventListener("change", () => {
-      renderOrderSheetData();
-    });
-  }
+  setupOrderSheetFilters();
   
   if (btnOrderSheetImportSales) {
     btnOrderSheetImportSales.addEventListener("click", () => {

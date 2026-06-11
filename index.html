@@ -1023,50 +1023,71 @@
           <div id="order-sheet-file-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
         </div>
 
-        <div id="order-sheet-data-container" style="display: none;">
-          <!-- 날짜 선택 필터 및 일괄 전표 생성 영역 -->
+        <div id="order-sheet-data-container" style="display: none; position: relative;">
+          <!-- 일괄 전표 생성 영역 -->
           <div class="card" style="margin-bottom: 20px;">
-            <div class="form-grid" style="grid-template-columns: 2fr 1.2fr; align-items: flex-end; gap: 15px;">
-              <div class="form-group">
-                <label for="order-sheet-date-select">납품 일자 선택</label>
-                <select id="order-sheet-date-select" class="form-control" style="background: rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.15); color:#fff;">
-                  <option value="">-- 일자를 선택하세요 --</option>
-                </select>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+              <div>
+                <h3 style="margin: 0; color: #fff;">발주서 매출 이관 및 재고 차감</h3>
+                <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: rgba(255,255,255,0.6);">
+                  현재 테이블에 필터링되어 노출 중인 발주 내역을 기준으로 학교별 매출 전표를 자동 분할 생성합니다.
+                </p>
               </div>
-              <button type="button" class="btn btn-primary" id="btn-order-sheet-import-sales" style="height: 42px; font-weight: bold; width: 100%;">
-                <i data-lucide="check-square"></i> 해당 날짜의 전표를 매출에 등록
+              <button type="button" class="btn btn-primary" id="btn-order-sheet-import-sales" style="height: 42px; font-weight: bold; min-width: 250px;">
+                <i data-lucide="check-square"></i> 필터링된 내역 매출에 일괄 등록
               </button>
             </div>
           </div>
 
-          <!-- 일자별 출고 피벗 현황 그리드 -->
-          <div class="card" style="margin-bottom: 20px;">
+          <!-- 통합 발주 데이터 테이블 (A~H열) -->
+          <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-              <h2 style="margin: 0;" id="order-sheet-pivot-title">선택한 날짜의 피벗 발주 현황</h2>
-              <span class="badge badge-info" id="order-sheet-pivot-info" style="background: rgba(167, 139, 250, 0.2); color: var(--primary-color); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">학교 수: 0개 | 품목 수: 0개</span>
+              <h2 style="margin: 0;">통합 발주 상세 내역 (전체 데이터)</h2>
+              <span class="badge badge-info" id="order-sheet-table-info" style="background: rgba(167, 139, 250, 0.2); color: var(--primary-color); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">
+                로드 수: 0행 | 필터링: 0행 | 합계 금액: 0원
+              </span>
             </div>
             
-            <div class="table-container pivot-table-container" style="overflow-x: auto; max-width: 100%;">
-              <table class="table" id="order-sheet-pivot-table" style="min-width: 800px; border-collapse: collapse; text-align: center;">
-                <!-- 동적으로 헤더 및 데이터 생성 -->
+            <div class="table-container" style="overflow-x: auto; max-width: 100%; max-height: 600px; overflow-y: auto;">
+              <table class="table" id="order-sheet-data-table" style="min-width: 1000px; border-collapse: collapse; text-align: center;">
+                <thead>
+                  <tr style="position: sticky; top: 0; background: #1a1a24; z-index: 10;">
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="date">납품일자 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="school">학교 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="product">품목 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="spec">규격/단위 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="qty">수량 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="price">단가(원) <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="amount">금액(원) <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                    <th style="cursor: pointer; position: relative; padding-right: 20px;" data-col="status">상태 <i data-lucide="filter" style="width: 12px; height: 12px; margin-left: 4px; opacity: 0.7;"></i></th>
+                  </tr>
+                </thead>
+                <tbody id="order-sheet-table-rows">
+                  <!-- 동적으로 TR 생성 -->
+                </tbody>
               </table>
             </div>
           </div>
 
-          <!-- 월간 누적 품목별 요약 테이블 -->
-          <div class="card">
-            <h2>월간 품목별 요약 누계</h2>
-            <div class="table-container" style="overflow-x: auto; max-width: 100%;">
-              <table class="table" style="min-width: 800px; border-collapse: collapse; text-align: center;">
-                <thead>
-                  <tr id="order-sheet-summary-headers">
-                    <!-- 동적으로 생성 -->
-                  </tr>
-                </thead>
-                <tbody id="order-sheet-summary-rows">
-                  <!-- 동적으로 생성 -->
-                </tbody>
-              </table>
+          <!-- 공용 헤더 필터 팝오버 레이어 -->
+          <div id="order-sheet-filter-popover" class="card" style="display: none; position: absolute; z-index: 100; width: 220px; max-height: 360px; padding: 12px; background: rgba(30, 30, 42, 0.95); border: 1px solid rgba(167, 139, 250, 0.4); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.6); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">
+              <span style="font-weight: bold; font-size: 0.85rem; color: var(--primary-color);" id="filter-popover-title">필터 옵션</span>
+              <span style="font-size: 0.75rem; color: #ff8585; cursor: pointer; font-weight: bold;" id="btn-filter-clear-column">초기화</span>
+            </div>
+            <div style="margin-bottom: 8px; display: flex; gap: 8px;">
+              <span style="font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer;" id="btn-filter-select-all">모두 선택</span>
+              <span style="font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer;" id="btn-filter-deselect-all">선택 해제</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <input type="text" id="filter-popover-search" placeholder="검색어 입력..." style="width: 100%; padding: 6px 8px; font-size: 0.78rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff; outline: none; box-sizing: border-box;">
+            </div>
+            <div id="filter-popover-options" style="overflow-y: auto; max-height: 160px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding-right: 4px;">
+              <!-- 체크박스 동적 로드 -->
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+              <button type="button" class="btn btn-secondary" id="btn-filter-cancel" style="padding: 4px 8px; font-size: 0.75rem; height: auto;">닫기</button>
+              <button type="button" class="btn btn-primary" id="btn-filter-apply" style="padding: 4px 12px; font-size: 0.75rem; height: auto; font-weight: bold;">적용</button>
             </div>
           </div>
         </div>
