@@ -341,6 +341,9 @@ function restoreSalesAndPurchasesFromInvoices() {
 let isSyncing = false;
 
 function saveDb() {
+  if (db.settings) {
+    db.settings.uploadedFilesJson = JSON.stringify(db.uploadedSchoolFiles || []);
+  }
   prepareInvoicesForSync();
   localStorage.setItem("erp_db_pro", JSON.stringify(db));
   updateDashboard();
@@ -418,6 +421,24 @@ async function syncFromCloud() {
       db.receivablesPayments = data.receivablesPayments || db.receivablesPayments || {};
       db.estimates = data.estimates || db.estimates || [];
       
+      // uploadedSchoolFiles 복원 처리
+      if (db.settings && db.settings.uploaded_files_json) {
+        try {
+          db.uploadedSchoolFiles = JSON.parse(db.settings.uploaded_files_json);
+        } catch (e) {
+          db.uploadedSchoolFiles = [];
+        }
+      } else if (db.settings && db.settings.uploadedFilesJson) {
+        try {
+          db.uploadedSchoolFiles = JSON.parse(db.settings.uploadedFilesJson);
+        } catch (e) {
+          db.uploadedSchoolFiles = [];
+        }
+      } else {
+        db.uploadedSchoolFiles = [];
+      }
+      window.uploadedSchoolFiles = db.uploadedSchoolFiles;
+      
       restoreSalesAndPurchasesFromInvoices();
       
       localStorage.setItem("erp_db_pro", JSON.stringify(db));
@@ -433,6 +454,9 @@ async function syncFromCloud() {
       renderSelectOptions();
       renderPurchaseList();
       renderSalesList();
+      
+      // 취합 리스트 렌더링 호출
+      processUploadedSchoolFiles();
     } else {
       console.warn("클라우드 데이터 로드 실패:", await response.text());
     }
@@ -654,10 +678,10 @@ function renderHqList() {
            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 0.65rem;" onclick="document.getElementById('change-stamp-${idx}').click()">등록</button>
          </div>`;
     row.innerHTML = `
-      <td><strong>${hq.name}</strong></td>
-      <td>${hq.regNo}</td>
-      <td>${hq.owner}</td>
-      <td>${hq.address}</td>
+      <td><strong>${escapeHtml(hq.name)}</strong></td>
+      <td>${escapeHtml(hq.regNo)}</td>
+      <td>${escapeHtml(hq.owner)}</td>
+      <td>${escapeHtml(hq.address)}</td>
       <td>${stampHtml}</td>
       <td>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deleteHq(${idx})">삭제</button>
@@ -735,11 +759,11 @@ function renderEmployeeList() {
   db.employees.forEach((emp, idx) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><code>${emp.code}</code></td>
-      <td><strong>${emp.name}</strong></td>
-      <td>${emp.dept}</td>
-      <td>${emp.position}</td>
-      <td>${emp.phone}</td>
+      <td><code>${escapeHtml(emp.code)}</code></td>
+      <td><strong>${escapeHtml(emp.name)}</strong></td>
+      <td>${escapeHtml(emp.dept)}</td>
+      <td>${escapeHtml(emp.position)}</td>
+      <td>${escapeHtml(emp.phone)}</td>
       <td>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deleteEmployee(${idx})">삭제</button>
       </td>
@@ -782,9 +806,9 @@ function renderBankList() {
   db.banks.forEach((bank, idx) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><strong>${bank.name}</strong></td>
-      <td>${bank.accNo}</td>
-      <td>${bank.owner}</td>
+      <td><strong>${escapeHtml(bank.name)}</strong></td>
+      <td>${escapeHtml(bank.accNo)}</td>
+      <td>${escapeHtml(bank.owner)}</td>
       <td><strong>${formatNumber(bank.balance)} 원</strong></td>
       <td>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deleteBank(${idx})">삭제</button>
@@ -841,13 +865,13 @@ function renderPartners() {
     
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><code>${p.code}</code></td>
-      <td><strong>${p.name}</strong></td>
-      <td><span class="hotkey-badge">${p.type}</span></td>
-      <td>${p.owner}</td>
-      <td>${p.bizNo}</td>
-      <td>${p.phone}</td>
-      <td>${p.address}</td>
+      <td><code>${escapeHtml(p.code)}</code></td>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td><span class="hotkey-badge">${escapeHtml(p.type)}</span></td>
+      <td>${escapeHtml(p.owner)}</td>
+      <td>${escapeHtml(p.bizNo)}</td>
+      <td>${escapeHtml(p.phone)}</td>
+      <td>${escapeHtml(p.address)}</td>
       <td>
         <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="editPartner(${idx})">수정</button>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deletePartner(${idx})">삭제</button>
@@ -947,13 +971,13 @@ function renderProducts() {
   db.products.forEach((p, idx) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td><code>${p.code}</code></td>
-      <td><strong>${p.name}</strong></td>
-      <td>${p.unit}</td>
-      <td><span style="color: var(--accent-color);">${p.origin}</span></td>
+      <td><code>${escapeHtml(p.code)}</code></td>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.unit)}</td>
+      <td><span style="color: var(--accent-color);">${escapeHtml(p.origin)}</span></td>
       <td>${formatNumber(p.purchasePrice)} 원</td>
       <td>${formatNumber(p.salesPrice)} 원</td>
-      <td><span class="hotkey-badge">${p.taxType}</span></td>
+      <td><span class="hotkey-badge">${escapeHtml(p.taxType)}</span></td>
       <td><strong>${p.stock}</strong></td>
       <td>
         <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="editProduct(${idx})">수정</button>
@@ -4581,10 +4605,10 @@ function importOrderSheetSales() {
   for (const groupKey in groupedOrders) {
     const group = groupedOrders[groupKey];
     const orderDate = group.date;
-    const schoolName = group.school;
+    const schoolName = (group.school || "").trim();
     const items = group.items;
     
-    let partnerObj = db.partners.find(p => p.name === schoolName);
+    let partnerObj = db.partners.find(p => (p.name || "").trim() === schoolName);
     if (!partnerObj) {
       const ptnId = "PTN-" + Date.now() + Math.random().toString(36).substring(2, 5);
       partnerObj = {

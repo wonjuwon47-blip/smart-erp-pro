@@ -328,9 +328,17 @@ async function initDb() {
         hk_f7 VARCHAR(50) DEFAULT 'purchase',
         hk_f8 VARCHAR(50) DEFAULT 'receivables',
         hk_f9 VARCHAR(50) DEFAULT 'excel-import',
-        active_hq_id INTEGER DEFAULT NULL
+        active_hq_id INTEGER DEFAULT NULL,
+        uploaded_files_json TEXT DEFAULT NULL
       )
     `);
+
+    // 기존 데이터베이스 호환성 확보를 위한 컬럼 강제 추가 시도
+    try {
+      await execute("ALTER TABLE settings ADD COLUMN uploaded_files_json TEXT");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
 
     console.log("데이터베이스 스키마(테이블 구조) 초기화가 완료되었습니다.");
   } catch (err) {
