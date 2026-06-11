@@ -180,7 +180,8 @@ const defaultDb = {
   },
   // 거래처별 수금/지급액 누계 (외상 관리용)
   receivablesPayments: {},
-  estimates: []
+  estimates: [],
+  uploadedSchoolFiles: []
 };
 
 let db = JSON.parse(localStorage.getItem("erp_db_pro")) || defaultDb;
@@ -3904,7 +3905,7 @@ if (btnDbReset) {
 
 // --- 통합 발주 데이터 캐시 객체 ---
 window.lastUploadedOrderData = null;
-window.uploadedSchoolFiles = [];
+window.uploadedSchoolFiles = db.uploadedSchoolFiles || [];
 
 // --- 개별 학교 발주 파일 비동기 로드 프로미스 ---
 function readFileAsArrayBuffer(file) {
@@ -3932,6 +3933,8 @@ function processUploadedSchoolFiles() {
       chip.querySelector(".remove-btn").addEventListener("click", (e) => {
         const removeIdx = parseInt(e.target.getAttribute("data-index"));
         window.uploadedSchoolFiles.splice(removeIdx, 1);
+        db.uploadedSchoolFiles = window.uploadedSchoolFiles;
+        saveDb();
         processUploadedSchoolFiles();
       });
       fileListEl.appendChild(chip);
@@ -4166,6 +4169,8 @@ function renderOrderSheetData() {
           }
         }
         
+        db.uploadedSchoolFiles = window.uploadedSchoolFiles;
+        saveDb();
         recalculateOrderSheetStats();
       });
       
@@ -4192,11 +4197,33 @@ function renderOrderSheetData() {
           desc: ""
         };
         
-        // 원본 배열에서 해당 행 바로 다음에 새 행 삽입
-        window.lastUploadedOrderData.rawRows.splice(rawIdx + 1, 0, newRow);
+        // 원본 배열(window.uploadedSchoolFiles)에서 해당 행 바로 다음에 새 행 삽입
+        let inserted = false;
+        for (const fileObj of window.uploadedSchoolFiles) {
+          const idxInFile = fileObj.rows.indexOf(currentRow);
+          if (idxInFile !== -1) {
+            fileObj.rows.splice(idxInFile + 1, 0, newRow);
+            inserted = true;
+            break;
+          }
+        }
         
-        // 리렌더링
-        renderOrderSheetData();
+        if (!inserted) {
+          if (window.uploadedSchoolFiles.length === 0) {
+            window.uploadedSchoolFiles = [{
+              fileName: "수동 등록 발주표",
+              school: "수동 등록",
+              rows: []
+            }];
+          }
+          window.uploadedSchoolFiles[0].rows.push(newRow);
+        }
+        
+        db.uploadedSchoolFiles = window.uploadedSchoolFiles;
+        saveDb();
+        
+        // 취합 및 리렌더링
+        processUploadedSchoolFiles();
         
         // 삽입된 행의 품목명 입력란으로 자동 포커스 이동
         setTimeout(() => {
@@ -4542,6 +4569,7 @@ function importOrderSheetSales() {
     row.status = "이관 완료";
   });
   
+  db.uploadedSchoolFiles = window.uploadedSchoolFiles;
   saveDb();
   renderOrderSheetData();
   
@@ -4889,6 +4917,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       orderSheetFileInput.value = "";
+      db.uploadedSchoolFiles = window.uploadedSchoolFiles;
+      saveDb();
       processUploadedSchoolFiles();
       
       if (pText) {
@@ -4908,16 +4938,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnOrderSheetAddRow = document.getElementById("btn-order-sheet-add-row");
   if (btnOrderSheetAddRow) {
     btnOrderSheetAddRow.addEventListener("click", () => {
-      if (!window.lastUploadedOrderData) {
-        window.lastUploadedOrderData = {
-          fileName: "수동 등록 데이터",
-          rawRows: [],
-          dates: [],
-          summaryHeaders: [],
-          summaryRows: []
-        };
-      }
-      
       // 모든 필터 해제
       Object.keys(window.orderSheetFilters).forEach(k => {
         window.orderSheetFilters[k] = null;
@@ -4940,9 +4960,23 @@ document.addEventListener("DOMContentLoaded", () => {
         desc: ""
       };
       
-      window.lastUploadedOrderData.rawRows.unshift(newRow); // 맨 위에 추가하여 즉시 편집 가능하도록 유도
+      if (!window.uploadedSchoolFiles || window.uploadedSchoolFiles.length === 0) {
+        window.uploadedSchoolFiles = [{
+          fileName: "수동 등록 발주표",
+          school: "수동 등록",
+          rows: []
+        }];
+      }
       
-      renderOrderSheetData();
+      // 맨 위에 새 행 추가
+      window.uploadedSchoolFiles[0].rows.unshift(newRow);
+      
+      // DB 영구 저장
+      db.uploadedSchoolFiles = window.uploadedSchoolFiles;
+      saveDb();
+      
+      // 취합 및 리렌더링
+      processUploadedSchoolFiles();
       
       // 새 행의 학교명 입력상자에 포커스 포지셔닝
       setTimeout(() => {
@@ -5460,5 +5494,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   startAutoSyncTimer();
+  
+  processUploadedSchoolFiles();
 
 });
