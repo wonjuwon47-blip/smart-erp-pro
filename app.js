@@ -4057,7 +4057,7 @@ function renderOrderSheetData() {
   
   let html = "";
   if (filteredRows.length === 0) {
-    html = `<tr><td colspan="8" style="padding: 30px; color: rgba(255,255,255,0.4);">조건을 만족하는 발주 내역이 없습니다.</td></tr>`;
+    html = `<tr><td colspan="9" style="padding: 30px; color: rgba(255,255,255,0.4);">조건을 만족하는 발주 내역이 없습니다.</td></tr>`;
   } else {
     filteredRows.forEach(r => {
       const rawIdx = window.lastUploadedOrderData.rawRows.indexOf(r);
@@ -4078,6 +4078,7 @@ function renderOrderSheetData() {
       const tdClass = hasDesc ? "tooltip-cell" : "";
       
       html += `<tr class="${rowClass}" data-raw-idx="${rawIdx}">`;
+      html += `<td style="padding: 6px;"><button type="button" class="btn-row-add-inline inline-row-add" title="아래에 행 추가"><i data-lucide="plus" style="width: 12px; height: 12px; vertical-align: middle;"></i></button></td>`;
       html += `<td><input type="text" class="inline-edit-input inline-date" value="${escapeHtml(r.date)}"></td>`;
       html += `<td><input type="text" class="inline-edit-input inline-school" style="text-align: left;" value="${escapeHtml(r.school)}"></td>`;
       html += `<td style="position: relative;" class="${tdClass}">
@@ -4101,7 +4102,10 @@ function renderOrderSheetData() {
     });
   }
   
-  if (tableRows) tableRows.innerHTML = html;
+  if (tableRows) {
+    tableRows.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons();
+  }
   
   const headers = document.querySelectorAll("#order-sheet-data-table th[data-col]");
   headers.forEach(th => {
@@ -4163,6 +4167,45 @@ function renderOrderSheetData() {
         }
         
         recalculateOrderSheetStats();
+      });
+      
+      tbody.addEventListener("click", (e) => {
+        const btn = e.target.closest(".inline-row-add");
+        if (!btn) return;
+        
+        const tr = btn.closest("tr");
+        if (!tr) return;
+        
+        const rawIdx = parseInt(tr.getAttribute("data-raw-idx"));
+        const currentRow = window.lastUploadedOrderData?.rawRows[rawIdx];
+        if (!currentRow) return;
+        
+        // 클릭한 행의 납품일자, 학교명을 복사하여 편의성 제공
+        const newRow = {
+          date: currentRow.date,
+          school: currentRow.school,
+          product: "",
+          spec: "",
+          qty: 0,
+          price: 0,
+          status: "추가",
+          desc: ""
+        };
+        
+        // 원본 배열에서 해당 행 바로 다음에 새 행 삽입
+        window.lastUploadedOrderData.rawRows.splice(rawIdx + 1, 0, newRow);
+        
+        // 리렌더링
+        renderOrderSheetData();
+        
+        // 삽입된 행의 품목명 입력란으로 자동 포커스 이동
+        setTimeout(() => {
+          const nextTr = document.getElementById("order-sheet-table-rows").querySelector(`tr[data-raw-idx="${rawIdx + 1}"]`);
+          if (nextTr) {
+            const input = nextTr.querySelector(".inline-product");
+            if (input) input.focus();
+          }
+        }, 50);
       });
       
       window.orderSheetTableEventsBound = true;

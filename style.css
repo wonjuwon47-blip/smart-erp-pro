@@ -964,6 +964,30 @@ td {
   background: rgba(59, 130, 246, 0.25) !important;
 }
 
+/* 인라인 행 추가 플러스 버튼 스타일 */
+.btn-row-add-inline {
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  color: var(--primary-color);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.btn-row-add-inline:hover {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+  transform: scale(1.15);
+}
+
 
 
 
