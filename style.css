@@ -844,6 +844,55 @@ td {
   height: 14px;
 }
 
+/* 품목 마우스 호버 커스텀 툴팁 스타일 */
+.tooltip-cell {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip-cell .tooltip-text {
+  visibility: hidden;
+  width: 220px;
+  background-color: rgba(30, 30, 42, 0.96);
+  color: #fff;
+  text-align: left;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 150;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  font-size: 0.75rem;
+  font-weight: normal;
+  white-space: normal;
+  word-break: break-all;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* 툴팁 하단 화살표 */
+.tooltip-cell .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(167, 139, 250, 0.4) transparent transparent transparent;
+}
+
+.tooltip-cell:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
 
 
 

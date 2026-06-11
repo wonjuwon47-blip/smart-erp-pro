@@ -4066,10 +4066,16 @@ function renderOrderSheetData() {
         ? "background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);"
         : "background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3);";
       
+      const hasDesc = r.desc && r.desc.trim().length > 0;
+      const tooltipHtml = hasDesc 
+        ? `<span class="tooltip-text">${escapeHtml(r.desc)}</span>` 
+        : "";
+      const tdClass = hasDesc ? "tooltip-cell" : "";
+      
       html += `<tr>`;
       html += `<td>${escapeHtml(r.date)}</td>`;
       html += `<td style="text-align: left; font-weight: 500;">${escapeHtml(r.school)}</td>`;
-      html += `<td style="text-align: left; font-weight: 600;">${escapeHtml(r.product)}</td>`;
+      html += `<td style="text-align: left; font-weight: 600; position: relative;" class="${tdClass}">${escapeHtml(r.product)}${tooltipHtml}</td>`;
       html += `<td style="color: rgba(255,255,255,0.6);">${escapeHtml(r.spec)}</td>`;
       html += `<td style="text-align: right; font-weight: bold;">${r.qty % 1 === 0 ? r.qty.toLocaleString() : r.qty.toFixed(2)}</td>`;
       html += `<td style="text-align: right; color: rgba(255,255,255,0.7);">${r.price.toLocaleString()}</td>`;
@@ -4549,6 +4555,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const schoolColIdx = headerRow.findIndex(h => String(h || '').trim() === '학교');
             const prodColIdx = headerRow.findIndex(h => String(h || '').trim() === '품목');
             const specColIdx = headerRow.findIndex(h => String(h || '').trim() === '규격/단위' || String(h || '').trim() === '규격');
+            const descColIdx = headerRow.findIndex(h => String(h || '').trim() === '속성설명' || String(h || '').trim() === '비고');
             const qtyColIdx = headerRow.findIndex(h => String(h || '').trim() === '수량');
             const priceColIdx = headerRow.findIndex(h => String(h || '').trim().startsWith('단가'));
             const statusColIdx = headerRow.findIndex(h => String(h || '').trim() === '상태');
@@ -4568,6 +4575,8 @@ document.addEventListener("DOMContentLoaded", () => {
               const dateStr = formatExcelDate(rawDate);
               let spec = specColIdx !== -1 ? String(row[specColIdx] || '').trim() : '';
               spec = sanitizeExcelUnitAndName(spec);
+              
+              let desc = descColIdx !== -1 && row[descColIdx] ? String(row[descColIdx]).trim() : '';
               
               const qty = parseFloat(String(row[qtyColIdx] || '0').replace(/,/g, ''));
               let price = parseFloat(String(row[priceColIdx] || '0').replace(/,/g, ''));
@@ -4592,7 +4601,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 spec: spec,
                 qty: qty,
                 price: price,
-                status: status
+                status: status,
+                desc: desc
               });
             }
             
@@ -4661,8 +4671,8 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const headerRow = rawData[headerRowIdx];
             const prodNameColIdx = headerRow.findIndex(h => h === '식품명' || h === '품목명' || h === '품목');
-            const specColIdx = headerRow.findIndex(h => h === '속성설명' || h === '규격/단위' || h === '규격');
-            const unitColIdx = headerRow.findIndex(h => h === '단위');
+            const specColIdx = headerRow.findIndex(h => h === '속성설명');
+            const unitColIdx = headerRow.findIndex(h => h === '단위' || h === '규격/단위' || h === '규격');
             
             const dateCols = [];
             headerRow.forEach((val, cIdx) => {
@@ -4690,9 +4700,12 @@ document.addEventListener("DOMContentLoaded", () => {
               }
               
               let spec = '';
-              if (specColIdx !== -1) spec = String(row[specColIdx] || '').trim();
-              if (!spec && unitColIdx !== -1) spec = String(row[unitColIdx] || '').trim();
+              if (unitColIdx !== -1) spec = String(row[unitColIdx] || '').trim();
+              if (!spec && specColIdx !== -1) spec = String(row[specColIdx] || '').trim();
               spec = sanitizeExcelUnitAndName(spec);
+              
+              let desc = '';
+              if (specColIdx !== -1) desc = String(row[specColIdx] || '').trim();
               
               dateCols.forEach(col => {
                 const val = row[col.index];
@@ -4716,7 +4729,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     spec: spec,
                     qty: qty,
                     price: price,
-                    status: "대기"
+                    status: "대기",
+                    desc: desc
                   });
                 }
               });
