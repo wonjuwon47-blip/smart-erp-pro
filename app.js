@@ -4060,11 +4060,16 @@ function renderOrderSheetData() {
     html = `<tr><td colspan="8" style="padding: 30px; color: rgba(255,255,255,0.4);">조건을 만족하는 발주 내역이 없습니다.</td></tr>`;
   } else {
     filteredRows.forEach(r => {
+      const rawIdx = window.lastUploadedOrderData.rawRows.indexOf(r);
       const amt = Math.round(r.qty * r.price);
       const st = r.status || "대기";
-      const badgeStyle = st === "이관 완료" 
-        ? "background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);"
-        : "background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3);";
+      
+      let rowClass = "";
+      if (st === "취소") {
+        rowClass = "row-status-cancelled";
+      } else if (st === "변경" || st === "추가") {
+        rowClass = "row-status-highlight-blue";
+      }
       
       const hasDesc = r.desc && r.desc.trim().length > 0;
       const tooltipHtml = hasDesc 
@@ -4072,15 +4077,26 @@ function renderOrderSheetData() {
         : "";
       const tdClass = hasDesc ? "tooltip-cell" : "";
       
-      html += `<tr>`;
-      html += `<td>${escapeHtml(r.date)}</td>`;
-      html += `<td style="text-align: left; font-weight: 500;">${escapeHtml(r.school)}</td>`;
-      html += `<td style="text-align: left; font-weight: 600; position: relative;" class="${tdClass}">${escapeHtml(r.product)}${tooltipHtml}</td>`;
-      html += `<td style="color: rgba(255,255,255,0.6);">${escapeHtml(r.spec)}</td>`;
-      html += `<td style="text-align: right; font-weight: bold;">${r.qty % 1 === 0 ? r.qty.toLocaleString() : r.qty.toFixed(2)}</td>`;
-      html += `<td style="text-align: right; color: rgba(255,255,255,0.7);">${r.price.toLocaleString()}</td>`;
-      html += `<td style="text-align: right; font-weight: bold; color: var(--primary-color);">${amt.toLocaleString()}</td>`;
-      html += `<td><span class="badge" style="padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; ${badgeStyle}">${st}</span></td>`;
+      html += `<tr class="${rowClass}" data-raw-idx="${rawIdx}">`;
+      html += `<td><input type="text" class="inline-edit-input inline-date" value="${escapeHtml(r.date)}"></td>`;
+      html += `<td><input type="text" class="inline-edit-input inline-school" style="text-align: left;" value="${escapeHtml(r.school)}"></td>`;
+      html += `<td style="position: relative;" class="${tdClass}">
+                <input type="text" class="inline-edit-input inline-product" style="text-align: left; font-weight: 600;" value="${escapeHtml(r.product)}">
+                ${tooltipHtml}
+               </td>`;
+      html += `<td><input type="text" class="inline-edit-input inline-spec" value="${escapeHtml(r.spec)}"></td>`;
+      html += `<td><input type="number" step="any" class="inline-edit-input inline-qty" style="text-align: right; font-weight: bold;" value="${r.qty}"></td>`;
+      html += `<td><input type="number" class="inline-edit-input inline-price" style="text-align: right;" value="${r.price}"></td>`;
+      html += `<td style="text-align: right; font-weight: bold; color: var(--primary-color);" class="inline-amount">${amt.toLocaleString()}</td>`;
+      html += `<td>
+                <select class="inline-edit-select inline-status">
+                  <option value="대기" ${st === "대기" ? "selected" : ""}>대기</option>
+                  <option value="이관 완료" ${st === "이관 완료" ? "selected" : ""}>이관 완료</option>
+                  <option value="취소" ${st === "취소" ? "selected" : ""}>취소</option>
+                  <option value="변경" ${st === "변경" ? "selected" : ""}>변경</option>
+                  <option value="추가" ${st === "추가" ? "selected" : ""}>추가</option>
+                </select>
+               </td>`;
       html += `</tr>`;
     });
   }
@@ -4096,6 +4112,76 @@ function renderOrderSheetData() {
       th.classList.remove("filter-active");
     }
   });
+  
+  // 테이블 내 인라인 편집 이벤트 위임 등록
+  if (!window.orderSheetTableEventsBound) {
+    const tbody = document.getElementById("order-sheet-table-rows");
+    if (tbody) {
+      tbody.addEventListener("input", (e) => {
+        const tr = e.target.closest("tr");
+        if (!tr) return;
+        const rawIdx = parseInt(tr.getAttribute("data-raw-idx"));
+        const rowData = window.lastUploadedOrderData?.rawRows[rawIdx];
+        if (!rowData) return;
+        
+        if (e.target.classList.contains("inline-date")) {
+          rowData.date = e.target.value;
+        } else if (e.target.classList.contains("inline-school")) {
+          rowData.school = e.target.value;
+        } else if (e.target.classList.contains("inline-product")) {
+          rowData.product = e.target.value;
+        } else if (e.target.classList.contains("inline-spec")) {
+          rowData.spec = e.target.value;
+        } else if (e.target.classList.contains("inline-qty")) {
+          rowData.qty = parseFloat(e.target.value) || 0;
+          const price = rowData.price || 0;
+          const amtEl = tr.querySelector(".inline-amount");
+          if (amtEl) amtEl.textContent = Math.round(rowData.qty * price).toLocaleString();
+        } else if (e.target.classList.contains("inline-price")) {
+          rowData.price = parseFloat(e.target.value) || 0;
+          const qty = rowData.qty || 0;
+          const amtEl = tr.querySelector(".inline-amount");
+          if (amtEl) amtEl.textContent = Math.round(qty * rowData.price).toLocaleString();
+        }
+      });
+      
+      tbody.addEventListener("change", (e) => {
+        const tr = e.target.closest("tr");
+        if (!tr) return;
+        const rawIdx = parseInt(tr.getAttribute("data-raw-idx"));
+        const rowData = window.lastUploadedOrderData?.rawRows[rawIdx];
+        if (!rowData) return;
+        
+        if (e.target.classList.contains("inline-status")) {
+          rowData.status = e.target.value;
+          tr.className = "";
+          if (rowData.status === "취소") {
+            tr.className = "row-status-cancelled";
+          } else if (rowData.status === "변경" || rowData.status === "추가") {
+            tr.className = "row-status-highlight-blue";
+          }
+        }
+        
+        recalculateOrderSheetStats();
+      });
+      
+      window.orderSheetTableEventsBound = true;
+    }
+  }
+}
+
+// --- 통합 발주표 합계 및 수량 통계 재계산 ---
+function recalculateOrderSheetStats() {
+  if (!window.lastUploadedOrderData) return;
+  const filteredRows = getFilteredOrderRows();
+  const totalLoad = window.lastUploadedOrderData.rawRows.length;
+  const totalFiltered = filteredRows.length;
+  const grandTotalAmount = filteredRows.reduce((sum, r) => sum + Math.round(r.qty * r.price), 0);
+  
+  const tableInfo = document.getElementById("order-sheet-table-info");
+  if (tableInfo) {
+    tableInfo.innerHTML = `로드 수: <strong>${totalLoad}</strong>행 | 필터링: <strong>${totalFiltered}</strong>행 | 합계 금액: <strong>${grandTotalAmount.toLocaleString()}</strong>원`;
+  }
 }
 
 // --- 헤더 필터 시스템 셋업 및 동작 ---
@@ -4775,6 +4861,56 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   setupOrderSheetFilters();
+  
+  const btnOrderSheetAddRow = document.getElementById("btn-order-sheet-add-row");
+  if (btnOrderSheetAddRow) {
+    btnOrderSheetAddRow.addEventListener("click", () => {
+      if (!window.lastUploadedOrderData) {
+        window.lastUploadedOrderData = {
+          fileName: "수동 등록 데이터",
+          rawRows: [],
+          dates: [],
+          summaryHeaders: [],
+          summaryRows: []
+        };
+      }
+      
+      // 모든 필터 해제
+      Object.keys(window.orderSheetFilters).forEach(k => {
+        window.orderSheetFilters[k] = null;
+      });
+      
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const d = String(today.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      
+      const newRow = {
+        date: dateStr,
+        school: "",
+        product: "",
+        spec: "",
+        qty: 0,
+        price: 0,
+        status: "추가",
+        desc: ""
+      };
+      
+      window.lastUploadedOrderData.rawRows.unshift(newRow); // 맨 위에 추가하여 즉시 편집 가능하도록 유도
+      
+      renderOrderSheetData();
+      
+      // 새 행의 학교명 입력상자에 포커스 포지셔닝
+      setTimeout(() => {
+        const firstRow = document.querySelector("#order-sheet-table-rows tr");
+        if (firstRow) {
+          const input = firstRow.querySelector(".inline-school");
+          if (input) input.focus();
+        }
+      }, 50);
+    });
+  }
   
   if (btnOrderSheetImportSales) {
     btnOrderSheetImportSales.addEventListener("click", () => {

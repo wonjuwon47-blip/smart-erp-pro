@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Tesseract.js OCR Library -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-D-tJ4ubT.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-DQg8r95H.css">
 </head>
 <body>
 
@@ -1033,9 +1033,14 @@
                   현재 테이블에 필터링되어 노출 중인 발주 내역을 기준으로 학교별 매출 전표를 자동 분할 생성합니다.
                 </p>
               </div>
-              <button type="button" class="btn btn-primary" id="btn-order-sheet-import-sales" style="height: 42px; font-weight: bold; min-width: 250px;">
-                <i data-lucide="check-square"></i> 필터링된 내역 매출에 일괄 등록
-              </button>
+              <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn" id="btn-order-sheet-add-row" style="height: 42px; font-weight: bold; min-width: 150px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                  <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> 발주 행 추가
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-order-sheet-import-sales" style="height: 42px; font-weight: bold; min-width: 250px;">
+                  <i data-lucide="check-square"></i> 필터링된 내역 매출에 일괄 등록
+                </button>
+              </div>
             </div>
           </div>
 

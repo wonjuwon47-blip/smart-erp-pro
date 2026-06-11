@@ -893,6 +893,77 @@ td {
   transform: translateX(-50%) translateY(-2px);
 }
 
+/* 통합 발주표 인라인 편집 및 상태별 행 스타일 */
+.inline-edit-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
+  text-align: inherit;
+  box-sizing: border-box;
+}
+
+.inline-edit-input:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.inline-edit-input:focus {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border-color: rgba(167, 139, 250, 0.5) !important;
+  outline: none;
+}
+
+.inline-edit-select {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.inline-edit-select:hover {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+.inline-edit-select option {
+  background: #1e1e2a;
+  color: #fff;
+}
+
+/* 취소 상태 행 */
+.row-status-cancelled {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: rgba(255, 255, 255, 0.35) !important;
+  text-decoration: line-through;
+}
+
+.row-status-cancelled input,
+.row-status-cancelled select {
+  color: rgba(255, 255, 255, 0.35) !important;
+  text-decoration: line-through;
+}
+
+/* 변경 및 추가 상태 행 */
+.row-status-highlight-blue {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #fff !important;
+}
+
+/* 호버 시 조금 더 선명하게 배경 표시 */
+.row-status-cancelled:hover,
+.row-status-highlight-blue:hover {
+  background: rgba(59, 130, 246, 0.25) !important;
+}
+
 
 
 
