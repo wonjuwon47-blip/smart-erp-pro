@@ -755,6 +755,51 @@ td {
   background: rgba(100, 80, 180, 0.95);
 }
 
+/* 업로드된 발주 파일 칩 스타일 */
+.order-file-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: #e9d5ff;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.order-file-chip:hover {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.5);
+  transform: translateY(-1px);
+}
+
+.order-file-chip span {
+  margin-right: 6px;
+}
+
+.order-file-chip .remove-btn {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: bold;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.order-file-chip .remove-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ff8585;
+}
+
 
 
 

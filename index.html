@@ -1014,12 +1014,13 @@
       <!-- TAB: ORDER SHEET -->
       <section id="tab-order-sheet" class="tab-content">
         <div class="card" style="margin-bottom: 20px;">
-          <h2>통합 발주 엑셀 파일 업로드</h2>
+          <h2>학교별 개별 발주서 다중 업로드</h2>
           <div class="drop-zone" id="order-sheet-drop-zone" style="border: 2px dashed rgba(167, 139, 250, 0.4); padding: 40px; text-align: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.02); transition: all 0.3s ease;">
             <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: var(--primary-color); margin-bottom: 12px; display: inline-block;"></i>
-            <p style="margin: 0; font-size: 0.95rem; color: rgba(255,255,255,0.7);">26년6월_농산_통합발주표_완성.xlsx 등의 파일을 여기에 드래그하거나 클릭하여 선택하세요.</p>
-            <input type="file" id="order-sheet-file-input" accept=".xlsx, .xls" style="display: none;">
+            <p style="margin: 0; font-size: 0.95rem; color: rgba(255,255,255,0.7);">학교별 발주서 파일들(0601농수산(오저).xlsx 등)을 여기에 여러 개 드래그하거나 클릭하여 다중 선택하세요.</p>
+            <input type="file" id="order-sheet-file-input" multiple accept=".xlsx, .xls" style="display: none;">
           </div>
+          <div id="order-sheet-file-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
         </div>
 
         <div id="order-sheet-data-container" style="display: none;">
