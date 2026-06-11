@@ -1525,7 +1525,8 @@ function getLabelHtml(sale) {
   if (supplierCore.length > 5) supplierCore = supplierCore.substring(0, 5);
 
   let labelHtml = "";
-  sale.items.forEach(item => {
+  sale.items.forEach((item, idx) => {
+    const isLast = idx === sale.items.length - 1;
     let itemNameCore = item.name.split("(")[0].trim().replace("경북 부사 ", "").replace("칠레산 ", "").replace("냉동 ", "");
     if (itemNameCore.length > 5) itemNameCore = itemNameCore.substring(0, 5);
     
@@ -1550,7 +1551,7 @@ function getLabelHtml(sale) {
     }
 
     labelHtml += `
-      <div class="print-label-box" style="width: 60mm; height: 60mm; page-break-after: always; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
+      <div class="print-label-box" style="width: 60mm; height: 60mm; page-break-after: ${isLast ? 'avoid' : 'always'}; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
         <!-- Row 1: 공급처 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
@@ -1714,7 +1715,7 @@ function triggerInvoicePrintDoc(sale) {
     `;
 
     fullHtml += `
-      <div class="print-invoice-page" style="width: 194mm; height: 138mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0 auto; padding: 1px; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
+      <div class="print-invoice-page" style="width: 194mm; height: 130mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0 auto; padding: 1px; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
         <div>
           <!-- 상단 타이틀 영역 (초슬림 여백) -->
           <div style="font-size: 13pt; font-weight: bold; text-align: left; color: #000; letter-spacing: 1px; margin-bottom: 0px; white-space: nowrap;">매출거래명세서</div>
@@ -1841,7 +1842,7 @@ function triggerInvoicePrintDoc(sale) {
     @media print {
       @page {
         size: landscape;
-        margin: 5mm 8mm;
+        margin: 0;
       }
     }
   `);
@@ -1974,7 +1975,7 @@ function triggerPurchaseInvoicePrintDoc(pur) {
     `;
 
     fullHtml += `
-      <div class="print-invoice-page" style="width: 194mm; height: 138mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0 auto; padding: 1px; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
+      <div class="print-invoice-page" style="width: 194mm; height: 130mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0 auto; padding: 1px; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
         <div>
           <!-- 상단 타이틀 영역 (초슬림 여백) -->
           <div style="font-size: 13pt; font-weight: bold; text-align: left; color: #000; letter-spacing: 1px; margin-bottom: 0px; white-space: nowrap;">매입거래명세서</div>
@@ -2101,7 +2102,7 @@ function triggerPurchaseInvoicePrintDoc(pur) {
     @media print {
       @page {
         size: landscape;
-        margin: 5mm 8mm;
+        margin: 0;
       }
     }
   `);
