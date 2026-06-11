@@ -702,6 +702,60 @@ td {
   text-align: right;
 }
 
+/* Order Sheet Drag & Drop Zone */
+.drop-zone.dragover {
+  border-color: var(--accent-color) !important;
+  background: rgba(167, 139, 250, 0.1) !important;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.3);
+}
+
+/* Pivot Grid Table Styling */
+.pivot-table-container {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+#order-sheet-pivot-table th, #order-sheet-pivot-table td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+#order-sheet-pivot-table th {
+  background: rgba(167, 139, 250, 0.15);
+  color: var(--primary-color);
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#order-sheet-pivot-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#order-sheet-pivot-table tr:last-child {
+  background: rgba(167, 139, 250, 0.08);
+  font-weight: bold;
+}
+
+#order-sheet-pivot-table td:nth-child(1), #order-sheet-pivot-table td:nth-child(2) {
+  position: sticky;
+  left: 0;
+  background: #111; /* Table cell background overlay */
+  z-index: 2;
+  border-right: 2px solid rgba(167, 139, 250, 0.2);
+}
+
+#order-sheet-pivot-table th:nth-child(1), #order-sheet-pivot-table th:nth-child(2) {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: rgba(100, 80, 180, 0.95);
+}
+
+
 
 
 
