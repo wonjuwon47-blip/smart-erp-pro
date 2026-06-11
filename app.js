@@ -821,6 +821,7 @@ window.deleteBank = function(idx) {
 // --- 5. 거래처 정보 CRUD 및 실시간 검색 기능 ---
 const formPartner = document.getElementById("form-partner");
 const partnerSearchInput = document.getElementById("partner-search-input");
+let editingPartnerIndex = null;
 
 function renderPartners() {
   const tbody = document.getElementById("partner-list-rows");
@@ -848,6 +849,7 @@ function renderPartners() {
       <td>${p.phone}</td>
       <td>${p.address}</td>
       <td>
+        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="editPartner(${idx})">수정</button>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deletePartner(${idx})">삭제</button>
       </td>
     `;
@@ -858,7 +860,7 @@ function renderPartners() {
 if(formPartner) {
   formPartner.addEventListener("submit", (e) => {
     e.preventDefault();
-    const newPartner = {
+    const updatedPartner = {
       code: document.getElementById("partner-code").value,
       name: document.getElementById("partner-name").value,
       owner: document.getElementById("partner-owner").value,
@@ -867,9 +869,22 @@ if(formPartner) {
       phone: document.getElementById("partner-phone").value,
       type: document.getElementById("partner-type").value
     };
-    db.partners.push(newPartner);
+
+    if (editingPartnerIndex !== null) {
+      db.partners[editingPartnerIndex] = updatedPartner;
+      editingPartnerIndex = null;
+      const submitBtn = document.getElementById("btn-partner-submit");
+      if (submitBtn) submitBtn.innerHTML = '<i data-lucide="plus"></i> 거래처 정보 등록';
+      const cancelBtn = document.getElementById("btn-cancel-partner-edit");
+      if (cancelBtn) cancelBtn.style.display = "none";
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      db.partners.push(updatedPartner);
+    }
+
     saveDb();
     renderPartners();
+    renderSelectOptions();
     formPartner.reset();
   });
 }
@@ -878,16 +893,53 @@ if(partnerSearchInput) {
   partnerSearchInput.addEventListener("input", renderPartners);
 }
 
+window.editPartner = function(idx) {
+  const p = db.partners[idx];
+  if (!p) return;
+
+  editingPartnerIndex = idx;
+  document.getElementById("partner-code").value = p.code || "";
+  document.getElementById("partner-name").value = p.name || "";
+  document.getElementById("partner-owner").value = p.owner || "";
+  document.getElementById("partner-biz-no").value = p.bizNo || "";
+  document.getElementById("partner-address").value = p.address || "";
+  document.getElementById("partner-phone").value = p.phone || "";
+  document.getElementById("partner-type").value = p.type || "혼합";
+
+  const submitBtn = document.getElementById("btn-partner-submit");
+  if (submitBtn) submitBtn.innerHTML = '<i data-lucide="check"></i> 거래처 정보 수정 완료';
+  const cancelBtn = document.getElementById("btn-cancel-partner-edit");
+  if (cancelBtn) cancelBtn.style.display = "inline-block";
+  if (window.lucide) window.lucide.createIcons();
+
+  formPartner.scrollIntoView({ behavior: 'smooth' });
+};
+
+const cancelPartnerEditBtn = document.getElementById("btn-cancel-partner-edit");
+if (cancelPartnerEditBtn) {
+  cancelPartnerEditBtn.addEventListener("click", () => {
+    editingPartnerIndex = null;
+    formPartner.reset();
+    const submitBtn = document.getElementById("btn-partner-submit");
+    if (submitBtn) submitBtn.innerHTML = '<i data-lucide="plus"></i> 거래처 정보 등록';
+    cancelPartnerEditBtn.style.display = "none";
+    if (window.lucide) window.lucide.createIcons();
+  });
+}
+
 window.deletePartner = function(idx) {
   if(confirm("해당 거래처를 삭제하시겠습니까?")) {
     db.partners.splice(idx, 1);
     saveDb();
     renderPartners();
+    renderSelectOptions();
   }
 };
 
 // --- 6. 물품 정보 CRUD ---
 const formProduct = document.getElementById("form-product");
+let editingProductIndex = null;
+
 function renderProducts() {
   const tbody = document.getElementById("product-list-rows");
   if(!tbody) return;
@@ -904,6 +956,7 @@ function renderProducts() {
       <td><span class="hotkey-badge">${p.taxType}</span></td>
       <td><strong>${p.stock}</strong></td>
       <td>
+        <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="editProduct(${idx})">수정</button>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="deleteProduct(${idx})">삭제</button>
       </td>
     `;
@@ -914,7 +967,7 @@ function renderProducts() {
 if(formProduct) {
   formProduct.addEventListener("submit", (e) => {
     e.preventDefault();
-    const newProduct = {
+    const updatedProduct = {
       code: document.getElementById("prod-code").value,
       name: document.getElementById("prod-name").value,
       unit: document.getElementById("prod-unit").value,
@@ -924,10 +977,57 @@ if(formProduct) {
       taxType: document.getElementById("prod-tax-type").value,
       stock: parseInt(document.getElementById("prod-stock").value) || 0
     };
-    db.products.push(newProduct);
+
+    if (editingProductIndex !== null) {
+      db.products[editingProductIndex] = updatedProduct;
+      editingProductIndex = null;
+      const submitBtn = document.getElementById("btn-product-submit");
+      if (submitBtn) submitBtn.innerHTML = '<i data-lucide="plus"></i> 물품 정보 저장';
+      const cancelBtn = document.getElementById("btn-cancel-product-edit");
+      if (cancelBtn) cancelBtn.style.display = "none";
+      if (window.lucide) window.lucide.createIcons();
+    } else {
+      db.products.push(updatedProduct);
+    }
+
     saveDb();
     renderProducts();
     formProduct.reset();
+  });
+}
+
+window.editProduct = function(idx) {
+  const p = db.products[idx];
+  if (!p) return;
+
+  editingProductIndex = idx;
+  document.getElementById("prod-code").value = p.code || "";
+  document.getElementById("prod-name").value = p.name || "";
+  document.getElementById("prod-unit").value = p.unit || "";
+  document.getElementById("prod-origin").value = p.origin || "";
+  document.getElementById("prod-purchase-price").value = p.purchasePrice || 0;
+  document.getElementById("prod-sales-price").value = p.salesPrice || 0;
+  document.getElementById("prod-tax-type").value = p.taxType || "과세";
+  document.getElementById("prod-stock").value = p.stock || 0;
+
+  const submitBtn = document.getElementById("btn-product-submit");
+  if (submitBtn) submitBtn.innerHTML = '<i data-lucide="check"></i> 물품 정보 수정 완료';
+  const cancelBtn = document.getElementById("btn-cancel-product-edit");
+  if (cancelBtn) cancelBtn.style.display = "inline-block";
+  if (window.lucide) window.lucide.createIcons();
+
+  formProduct.scrollIntoView({ behavior: 'smooth' });
+};
+
+const cancelProductEditBtn = document.getElementById("btn-cancel-product-edit");
+if (cancelProductEditBtn) {
+  cancelProductEditBtn.addEventListener("click", () => {
+    editingProductIndex = null;
+    formProduct.reset();
+    const submitBtn = document.getElementById("btn-product-submit");
+    if (submitBtn) submitBtn.innerHTML = '<i data-lucide="plus"></i> 물품 정보 저장';
+    cancelProductEditBtn.style.display = "none";
+    if (window.lucide) window.lucide.createIcons();
   });
 }
 

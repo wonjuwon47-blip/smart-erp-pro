@@ -441,7 +441,10 @@
                 </select>
               </div>
             </div>
-            <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> 거래처 정보 등록</button>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="submit" class="btn btn-primary" id="btn-partner-submit"><i data-lucide="plus"></i> 거래처 정보 등록</button>
+              <button type="button" class="btn btn-secondary" id="btn-cancel-partner-edit" style="display: none;">수정 취소</button>
+            </div>
           </form>
         </div>
 
@@ -511,7 +514,10 @@
                 <input type="number" id="prod-stock" value="0" required>
               </div>
             </div>
-            <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> 물품 정보 저장</button>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="submit" class="btn btn-primary" id="btn-product-submit"><i data-lucide="plus"></i> 물품 정보 저장</button>
+              <button type="button" class="btn btn-secondary" id="btn-cancel-product-edit" style="display: none;">수정 취소</button>
+            </div>
           </form>
         </div>
 
