@@ -368,20 +368,21 @@ td {
   display: none;
 }
 
-/* Print stylesheet for A5 Landscape invoice size */
 @media print {
-  body * {
-    visibility: hidden;
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: auto !important;
+    overflow: visible !important;
   }
-  #print-document-area, #print-document-area * {
-    visibility: visible;
+  /* 인쇄 영역을 제외한 모든 요소를 레이아웃에서 완전히 제거 */
+  body > *:not(#print-document-area) {
+    display: none !important;
   }
   #print-document-area {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 194mm; /* Fits nicely in A5 width 210mm with margins */
+    position: relative !important;
+    width: 100% !important;
     padding: 0;
     margin: 0;
     color: #000 !important;
