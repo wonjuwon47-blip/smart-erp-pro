@@ -3946,6 +3946,26 @@ function processUploadedSchoolFiles() {
     mergedRows.push(...fileObj.rows);
   });
   
+  // 3중 기본 정렬 적용:
+  // 1순위 납품일자(내림차순)
+  // 2순위 학교(오름차순, 가나다순)
+  // 3순위 품목(오름차순, ㄱ~ㅎ순)
+  mergedRows.sort((a, b) => {
+    const dateA = a.date || "";
+    const dateB = b.date || "";
+    if (dateA !== dateB) {
+      return dateB.localeCompare(dateA);
+    }
+    const schoolA = a.school || "";
+    const schoolB = b.school || "";
+    if (schoolA !== schoolB) {
+      return schoolA.localeCompare(schoolB, "ko");
+    }
+    const productA = a.product || "";
+    const productB = b.product || "";
+    return productA.localeCompare(productB, "ko");
+  });
+  
   if (mergedRows.length === 0) {
     window.lastUploadedOrderData = null;
     renderOrderSheetData();
@@ -3974,14 +3994,6 @@ function processUploadedSchoolFiles() {
   
   const summaryHeaders = ['품목', '규격/단위', ...uniqueSchools, '총합계수량'];
   const summaryRows = Object.values(productSummaryMap).sort((a, b) => a['품목'].localeCompare(b['품목']));
-  
-  window.lastUploadedOrderData = {
-    fileName: `${window.uploadedSchoolFiles.length}개 학교 통합`,
-    rawRows: mergedRows,
-    dates: dates,
-    summaryHeaders: summaryHeaders,
-    summaryRows: summaryRows
-  };
   
   window.lastUploadedOrderData = {
     fileName: `${window.uploadedSchoolFiles.length}개 학교 통합`,
