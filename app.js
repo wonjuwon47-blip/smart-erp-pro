@@ -5393,6 +5393,7 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("erp_user_info", JSON.stringify(data.user));
             
             updateLoginStatusUI(data.user);
+            updateCloudSyncStatusUI();
             authOverlay.style.display = "none";
             
             await syncFromCloud();
@@ -5416,6 +5417,42 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function updateCloudSyncStatusUI() {
+    const statusEl = document.getElementById("cloud-sync-status");
+    if (!statusEl) return;
+    
+    const token = localStorage.getItem("erp_jwt_token");
+    if (token) {
+      statusEl.innerHTML = `
+        <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+        <span style="color: #10b981;">실시간 클라우드 동기화 활성화됨</span>
+      `;
+    } else {
+      statusEl.innerHTML = `
+        <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
+        <span style="color: #ef4444;">로컬 오프라인 모드</span>
+      `;
+    }
+  }
+
+  const btnCloudSync = document.getElementById("btn-cloud-sync");
+  if (btnCloudSync) {
+    btnCloudSync.addEventListener("click", async () => {
+      const token = localStorage.getItem("erp_jwt_token");
+      if (!token) {
+        const authOverlay = document.getElementById("auth-overlay");
+        if (authOverlay) {
+          authOverlay.style.display = "flex";
+        }
+      } else {
+        alert("클라우드와 실시간 동기화를 시작합니다.");
+        await syncFromCloud();
+        await syncToCloud();
+        updateCloudSyncStatusUI();
+      }
+    });
+  }
+
   const btnLogout = document.getElementById("btn-logout");
   if (btnLogout) {
     btnLogout.addEventListener("click", () => {
@@ -5431,6 +5468,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const token = localStorage.getItem("erp_jwt_token");
     if (!token) {
       authOverlay.style.display = "flex";
+      updateCloudSyncStatusUI();
       return;
     }
     
@@ -5441,12 +5479,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (response.ok) {
         const data = await response.json();
         updateLoginStatusUI(data.user);
+        updateCloudSyncStatusUI();
         authOverlay.style.display = "none";
         await syncFromCloud();
       } else {
         localStorage.removeItem("erp_jwt_token");
         localStorage.removeItem("erp_user_info");
         authOverlay.style.display = "flex";
+        updateCloudSyncStatusUI();
       }
     } catch (err) {
       console.warn("인증 확인 실패 (오프라인 모드 우선 작동):", err);
@@ -5458,6 +5498,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         authOverlay.style.display = "flex";
       }
+      updateCloudSyncStatusUI();
     }
   }
 
