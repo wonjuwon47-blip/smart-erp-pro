@@ -3947,14 +3947,14 @@ function processUploadedSchoolFiles() {
   });
   
   // 3중 기본 정렬 적용:
-  // 1순위 납품일자(내림차순)
+  // 1순위 납품일자(오름차순)
   // 2순위 학교(오름차순, 가나다순)
   // 3순위 품목(오름차순, ㄱ~ㅎ순)
   mergedRows.sort((a, b) => {
     const dateA = a.date || "";
     const dateB = b.date || "";
     if (dateA !== dateB) {
-      return dateB.localeCompare(dateA);
+      return dateA.localeCompare(dateB);
     }
     const schoolA = a.school || "";
     const schoolB = b.school || "";
