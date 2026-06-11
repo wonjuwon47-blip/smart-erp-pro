@@ -25,6 +25,45 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// --- 한국 표준시(KST) 오늘 날짜 구하기 ---
+function getKstTodayString() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return (new Date(now.getTime() - offset)).toISOString().substring(0, 10);
+}
+
+// --- 인쇄용 동적 스타일 태그 제어 ---
+function injectPrintStyle(cssText) {
+  let styleEl = document.getElementById("print-dynamic-style");
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "print-dynamic-style";
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = cssText;
+}
+
+function clearPrintStyle() {
+  const styleEl = document.getElementById("print-dynamic-style");
+  if (styleEl) {
+    styleEl.remove();
+  }
+}
+
+// --- 라벨 인쇄 스위치 강제 리셋 (OFF 상태로 초기화) ---
+function resetLabelPrintToggle() {
+  const toggleWrapper = document.getElementById("label-print-toggle-wrapper");
+  const inputToggle = document.getElementById("sales-label-print-toggle");
+  if (toggleWrapper && inputToggle) {
+    inputToggle.value = "off";
+    const track = toggleWrapper.querySelector(".toggle-track");
+    const textEl = toggleWrapper.querySelector(".toggle-text");
+    if (track) track.className = "toggle-track off";
+    if (textEl) textEl.textContent = "OFF";
+  }
+}
+
+
 // --- 엑셀 단위 및 품명 정규화 (1000g/kg -> kg) ---
 function sanitizeExcelUnitAndName(str) {
   if (str === null || str === undefined) return "";
@@ -323,7 +362,8 @@ function renderCartCommon(cartArray, tbodyId, config) {
     const incomingVal = item.incomingDate || "";
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${escapeHtml(item.name)}</td>
+      <td><input type="text" value="${escapeHtml(item.name)}" style="width:160px; ${INLINE_INPUT_STYLE} text-align:left;"
+        oninput="${config.cartName}[${idx}].name = this.value"></td>
       <td><input type="text" value="${escapeHtml(item.unit || '')}" style="width:70px; ${INLINE_INPUT_STYLE} text-align:center;"
         oninput="${config.cartName}[${idx}].unit = this.value"></td>
       <td><input type="text" value="${escapeHtml(item.origin || '')}" style="width:85px; ${INLINE_INPUT_STYLE} text-align:center;"
@@ -342,8 +382,8 @@ function renderCartCommon(cartArray, tbodyId, config) {
             onchange="window.toggleCartItemTax('${config.cartName}', ${idx}, '${config.updateFnName}')"
             style="cursor: pointer; width: 14px; height: 14px; accent-color: #a8e6cf;"
             ${(() => {
-              const prodMeta = db.products.find(p => p.name === item.name);
-              return prodMeta && prodMeta.taxType === TAX_TYPE_EXEMPT ? "disabled title='면세 품목'" : "";
+              const isExempt = item.taxType === TAX_TYPE_EXEMPT;
+              return isExempt ? "disabled title='면세 품목'" : "";
             })()}>
           <input type="number" id="${config.taxIdPrefix}-${idx}" value="${item.tax}" min="0" style="width:70px; ${INLINE_INPUT_STYLE} text-align:right;"
             oninput="${config.updateFnName}(${idx}, 'tax', this.value)">
@@ -1039,7 +1079,7 @@ if (btnAddPurItem) {
     }
     const qty = parseFloat(document.getElementById("pur-item-qty").value) || 1.0;
     const origin = document.getElementById("pur-item-origin").value;
-    const purDateVal = document.getElementById("pur-date")?.value || new Date().toISOString().substring(0, 10);
+    const purDateVal = document.getElementById("pur-date")?.value || getKstTodayString();
     const incomingDate = document.getElementById("pur-item-incoming")?.value || purDateVal;
     const price = parseInt(document.getElementById("pur-item-price").value) || 0;
     const unit = document.getElementById("pur-item-unit").value || "BOX";
@@ -1050,7 +1090,7 @@ if (btnAddPurItem) {
     const tax = 0;
     const total = amount;
 
-    purchaseCart.push({ name: itemName, unit, origin, incomingDate, qty, price, amount, tax, total, isTaxApplied: false });
+    purchaseCart.push({ name: itemName, unit, origin, incomingDate, qty, price, amount, tax, total, isTaxApplied: false, taxType: prodMeta ? prodMeta.taxType : TAX_TYPE_TAXABLE });
     renderPurCart();
     
     // 폼 초기화 (입고일은 매입일자와 매칭)
@@ -1166,7 +1206,7 @@ if (formPurchaseBill) {
     formPurchaseBill.reset();
     resetPurTaxState();
     
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = getKstTodayString();
     document.getElementById("pur-date").value = todayStr;
     if (document.getElementById("pur-item-incoming")) {
       document.getElementById("pur-item-incoming").value = todayStr;
@@ -1241,9 +1281,11 @@ window.editPurchase = function(idx) {
   editingPurchaseId = pur.id;
   purchaseCart = JSON.parse(JSON.stringify(pur.items));
   
-  // 각 품목별 부가세 여부를 기존 세액 기준으로 복구
+  // 각 품목별 부가세 여부를 기존 세액 기준으로 복구 및 면세 여부 획득
   purchaseCart.forEach(item => {
     item.isTaxApplied = (item.tax > 0);
+    const prodMeta = db.products.find(p => p.name === item.name);
+    item.taxType = prodMeta ? prodMeta.taxType : (item.tax > 0 ? TAX_TYPE_TAXABLE : TAX_TYPE_EXEMPT);
   });
 
   renderPurCart();
@@ -1291,7 +1333,7 @@ window.cancelEditPurchase = function() {
   renderPurCart();
   document.getElementById("form-purchase-bill").reset();
 
-  const todayStr = new Date().toISOString().substring(0, 10);
+  const todayStr = getKstTodayString();
   document.getElementById("pur-date").value = todayStr;
   if (document.getElementById("pur-item-incoming")) {
     document.getElementById("pur-item-incoming").value = todayStr;
@@ -1316,7 +1358,7 @@ if (btnAddSalesItem) {
     }
     const qty = parseFloat(document.getElementById("sales-item-qty").value) || 1.0;
     const origin = document.getElementById("sales-item-origin").value;
-    const salesDateVal = document.getElementById("sales-date")?.value || new Date().toISOString().substring(0, 10);
+    const salesDateVal = document.getElementById("sales-date")?.value || getKstTodayString();
     const incomingDate = document.getElementById("sales-item-incoming")?.value || salesDateVal;
     const price = parseInt(document.getElementById("sales-item-price").value) || 0;
     const unit = document.getElementById("sales-item-unit").value || "BOX";
@@ -1327,7 +1369,7 @@ if (btnAddSalesItem) {
     const tax = 0;
     const total = amount;
 
-    salesCart.push({ name: itemName, unit, origin, incomingDate, qty, price, amount, tax, total, isTaxApplied: false });
+    salesCart.push({ name: itemName, unit, origin, incomingDate, qty, price, amount, tax, total, isTaxApplied: false, taxType: prodMeta ? prodMeta.taxType : TAX_TYPE_TAXABLE });
     renderSalesCart();
     
     // 폼 초기화 (입고일은 매출일자와 매칭)
@@ -1446,9 +1488,12 @@ if (formSalesBill) {
     
     saveDb();
     
+    const printToggleEl = document.getElementById("sales-label-print-toggle");
+    const isLabelOn = printToggleEl ? printToggleEl.value === "on" : false;
+
     // 명세서 기본 출력 진행
     if (shouldPrintSales) {
-      triggerInvoicePrintDoc(newSale);
+      handleSalesPrint(newSale, isLabelOn);
     } else {
       alert("매출 전표가 성공적으로 저장되었습니다.");
     }
@@ -1456,9 +1501,10 @@ if (formSalesBill) {
     salesCart = [];
     renderSalesCart();
     formSalesBill.reset();
+    resetLabelPrintToggle();
     resetSalesTaxState();
     
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = getKstTodayString();
     document.getElementById("sales-date").value = todayStr;
     if (document.getElementById("sales-item-incoming")) {
       document.getElementById("sales-item-incoming").value = todayStr;
@@ -1538,9 +1584,18 @@ function getLabelHtml(sale) {
 }
 
 function triggerLabelPrintDoc(sale) {
+  injectPrintStyle(`
+    @media print {
+      @page {
+        size: 60mm 60mm;
+        margin: 0;
+      }
+    }
+  `);
   const printArea = document.getElementById("print-document-area");
   printArea.innerHTML = getLabelHtml(sale);
   window.print();
+  clearPrintStyle();
 }
 
 function triggerInvoicePrintDoc(sale) {
@@ -1782,14 +1837,25 @@ function triggerInvoicePrintDoc(sale) {
     `;
   }
 
-  const printToggleEl = document.getElementById("sales-label-print-toggle");
-  const isLabelOn = printToggleEl ? printToggleEl.value === "on" : false;
-  if (isLabelOn) {
-    fullHtml += `<div style="page-break-before: always;"></div>` + getLabelHtml(sale);
-  }
-
+  injectPrintStyle(`
+    @media print {
+      @page {
+        size: landscape;
+        margin: 5mm 8mm;
+      }
+    }
+  `);
   printArea.innerHTML = fullHtml;
   window.print();
+  clearPrintStyle();
+}
+
+async function handleSalesPrint(sale, isLabelOn) {
+  triggerInvoicePrintDoc(sale);
+  if (isLabelOn) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    triggerLabelPrintDoc(sale);
+  }
 }
 
 function triggerPurchaseInvoicePrintDoc(pur) {
@@ -2031,8 +2097,17 @@ function triggerPurchaseInvoicePrintDoc(pur) {
     `;
   }
 
+  injectPrintStyle(`
+    @media print {
+      @page {
+        size: landscape;
+        margin: 5mm 8mm;
+      }
+    }
+  `);
   printArea.innerHTML = fullHtml;
   window.print();
+  clearPrintStyle();
 }
 
 function renderSalesList() {
@@ -2107,9 +2182,11 @@ window.editSales = function(idx) {
   // 매출 입력 카트에 기존 품목 로드 (깊은 복사)
   salesCart = JSON.parse(JSON.stringify(sale.items));
 
-  // 각 품목별 부가세 여부를 기존 세액 기준으로 복구
+  // 각 품목별 부가세 여부를 기존 세액 기준으로 복구 및 면세 여부 획득
   salesCart.forEach(item => {
     item.isTaxApplied = (item.tax > 0);
+    const prodMeta = db.products.find(p => p.name === item.name);
+    item.taxType = prodMeta ? prodMeta.taxType : (item.tax > 0 ? TAX_TYPE_TAXABLE : TAX_TYPE_EXEMPT);
   });
 
   renderSalesCart();
@@ -2162,8 +2239,9 @@ window.cancelEditSales = function() {
   resetSalesTaxState(); // 부가세 상태 초기화
   renderSalesCart();
   document.getElementById("form-sales-bill").reset();
+  resetLabelPrintToggle();
 
-  const todayStr = new Date().toISOString().substring(0, 10);
+  const todayStr = getKstTodayString();
   document.getElementById("sales-date").value = todayStr;
   if (document.getElementById("sales-item-incoming")) {
     document.getElementById("sales-item-incoming").value = todayStr;
@@ -2377,7 +2455,7 @@ if (formEstimate) {
     prefillEstimateSupplier();
     
     // 오늘 날짜 기본 지정
-    const todayStr = new Date().toISOString().substring(0, 10);
+    const todayStr = getKstTodayString();
     document.getElementById("est-date").value = todayStr;
     document.getElementById("est-serial").value = Math.floor(Math.random() * 1000) + "-" + Math.floor(Math.random() * 1000);
 
@@ -2464,7 +2542,7 @@ window.cancelEditEstimate = function() {
   document.getElementById("form-estimate").reset();
   prefillEstimateSupplier();
 
-  const todayStr = new Date().toISOString().substring(0, 10);
+  const todayStr = getKstTodayString();
   document.getElementById("est-date").value = todayStr;
   document.getElementById("est-serial").value = Math.floor(Math.random() * 1000) + "-" + Math.floor(Math.random() * 1000);
 
@@ -2629,7 +2707,16 @@ function triggerEstimatePrintDoc(est) {
     </div>
   `;
 
+  injectPrintStyle(`
+    @media print {
+      @page {
+        size: portrait;
+        margin: 10mm;
+      }
+    }
+  `);
   window.print();
+  clearPrintStyle();
 }
 
 // --- 9. 외상대금 및 미수금 수금/지급장 관리 ---
@@ -2851,7 +2938,7 @@ function parseOcrText(text) {
   }
   
   // 3. 거래일자 추출
-  let invoiceDate = new Date().toISOString().substring(0, 10);
+  let invoiceDate = getKstTodayString();
   const dateRegex = /(\d{4})[-./년]\s*(\d{1,2})[-./월]\s*(\d{1,2})/;
   for (const line of lines) {
     const match = line.match(dateRegex);
@@ -2994,7 +3081,7 @@ function fallbackToMock(reason) {
   window.currentOcrData = {
     bizNo: "603-81-11270",
     partnerName: partnerName,
-    invoiceDate: new Date().toISOString().substring(0, 10),
+    invoiceDate: getKstTodayString(),
     items: mockOcrItems.map(item => ({
       code: item.code,
       name: item.name,
@@ -3093,7 +3180,7 @@ window.applyOcrCorrection = function() {
   if (!window.currentOcrData) return;
   
   const partnerName = document.getElementById("ocr-correct-partner").value.trim() || "OCR 추출 거래처";
-  const invoiceDate = document.getElementById("ocr-correct-date").value || new Date().toISOString().substring(0, 10);
+  const invoiceDate = document.getElementById("ocr-correct-date").value || getKstTodayString();
   
   if (window.currentOcrData.items.length === 0) {
     alert("등록할 품목이 없습니다.");
@@ -3147,7 +3234,8 @@ window.applyOcrCorrection = function() {
       amount: amount,
       tax: 0,
       total: amount,
-      isTaxApplied: false
+      isTaxApplied: false,
+      taxType: prod.taxType
     });
   });
   
@@ -3537,7 +3625,7 @@ if (btnExport) {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `SmartERP_DB_Backup_${new Date().toISOString().substring(0,10)}.json`);
+    dlAnchorElem.setAttribute("download", `SmartERP_DB_Backup_${getKstTodayString()}.json`);
     dlAnchorElem.click();
   });
 }
@@ -3658,7 +3746,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (window.lucide) window.lucide.createIcons();
 
-  const todayStr = new Date().toISOString().substring(0, 10);
+  const todayStr = getKstTodayString();
   if(document.getElementById("pur-date")) document.getElementById("pur-date").value = todayStr;
   if(document.getElementById("sales-date")) document.getElementById("sales-date").value = todayStr;
   
@@ -4064,5 +4152,49 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   checkAuth();
+
+  // --- 실시간 자동 데이터 동기화 감지 타이머 및 포커스 이벤트 ---
+  function startAutoSyncTimer() {
+    // 15초마다 백그라운드 폴링 실행
+    setInterval(async () => {
+      const token = localStorage.getItem("erp_jwt_token");
+      if (!token || isSyncing) return;
+      
+      // 사용자가 무언가를 활발히 편집 중인 경우는 UI 갱신으로 인한 충돌 방지
+      const isUserEditing = (
+        editingSalesId !== null || 
+        editingPurchaseId !== null || 
+        editingEstimateId !== null ||
+        salesCart.length > 0 ||
+        purchaseCart.length > 0
+      );
+      
+      if (!isUserEditing) {
+        console.log("백그라운드 자동 동기화 실행 중...");
+        await syncFromCloud();
+      }
+    }, 15000);
+
+    // 창에 다시 포커스가 왔을 때 자동 실행
+    window.addEventListener("focus", async () => {
+      const token = localStorage.getItem("erp_jwt_token");
+      if (!token || isSyncing) return;
+
+      const isUserEditing = (
+        editingSalesId !== null || 
+        editingPurchaseId !== null || 
+        editingEstimateId !== null ||
+        salesCart.length > 0 ||
+        purchaseCart.length > 0
+      );
+
+      if (!isUserEditing) {
+        console.log("포커스 획득에 따른 동기화 실행 중...");
+        await syncFromCloud();
+      }
+    });
+  }
+
+  startAutoSyncTimer();
 
 });

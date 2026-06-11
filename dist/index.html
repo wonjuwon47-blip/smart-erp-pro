@@ -4,15 +4,74 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI SMART ERP</title>
-  <link rel="stylesheet" href="/style.css">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- SheetJS Excel Library -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Tesseract.js OCR Library -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Bl_2beue.css">
 </head>
 <body>
+
+  <!-- 로그인 / 회원가입 인증 화면 (실시간 클라우드 공유용) -->
+  <div id="auth-overlay" style="display: flex; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at top right, #2c1b4d, #0f0c1b); z-index: 9999; align-items: center; justify-content: center; font-family: 'Noto Sans KR', sans-serif; padding: 20px; box-sizing: border-box;">
+    <div style="background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 40px 32px; width: 100%; max-width: 420px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4); text-align: center; box-sizing: border-box;">
+      <div style="margin-bottom: 32px;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #a78bfa, #818cf8); color: #fff; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);">
+          <i data-lucide="shield" style="width: 28px; height: 28px;"></i>
+        </div>
+        <h2 style="margin: 0 0 8px 0; color: #fff; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px;">AI SMART ERP</h2>
+        <p id="auth-subtitle" style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 0.9rem;">회사 통합 업무 재무 관리 시스템 로그인</p>
+      </div>
+
+      <div id="auth-error-msg" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; border-radius: 8px; padding: 12px; font-size: 0.85rem; margin-bottom: 20px; text-align: left; line-height: 1.4;"></div>
+
+      <form id="form-auth" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="text-align: left;">
+          <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">아이디 (ID)</label>
+          <div style="position: relative;">
+            <i data-lucide="user" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+            <input type="text" id="auth-username" placeholder="아이디를 입력하세요" required style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <div style="text-align: left;">
+          <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">비밀번호</label>
+          <div style="position: relative;">
+            <i data-lucide="lock" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+            <input type="password" id="auth-password" placeholder="비밀번호를 입력하세요" required style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+          </div>
+        </div>
+
+        <!-- 회원가입 추가 필드들 -->
+        <div id="auth-register-fields" style="display: none; flex-direction: column; gap: 16px;">
+          <div style="text-align: left;">
+            <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">회사명 (신규 등록)</label>
+            <div style="position: relative;">
+              <i data-lucide="briefcase" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+              <input type="text" id="auth-company-name" placeholder="회사 상호명을 입력하세요" style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+
+          <div style="text-align: left;">
+            <label style="display: block; font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 6px; font-weight: 600;">성명 (사용자 실명)</label>
+            <div style="position: relative;">
+              <i data-lucide="user-check" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.4); width: 16px; height: 16px;"></i>
+              <input type="text" id="auth-user-fullname" placeholder="본인의 이름을 입력하세요" style="width: 100%; padding: 12px 12px 12px 38px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-auth-submit" style="margin-top: 8px; padding: 14px; background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; border-radius: 8px; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); transition: opacity 0.2s;">로그인 완료</button>
+      </form>
+
+      <div style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.5);">
+        <span id="auth-mode-msg">아직 회사 계정이 없으신가요?</span>
+        <span id="btn-auth-toggle-mode" style="color: #c084fc; cursor: pointer; font-weight: 600; text-decoration: underline; margin-left: 4px;">신규 개설 및 가입</span>
+      </div>
+    </div>
+  </div>
 
   <div class="app-container">
     <!-- Sidebar Navigation -->
@@ -664,11 +723,11 @@
               <div class="form-group">
                 <label>라벨 스티커 출력</label>
                 <div class="toggle-container" id="label-print-toggle-wrapper">
-                  <div class="toggle-track on">
-                    <span class="toggle-text">ON</span>
+                  <div class="toggle-track off">
+                    <span class="toggle-text">OFF</span>
                     <div class="toggle-handle"></div>
                   </div>
-                  <input type="hidden" id="sales-label-print-toggle" value="on">
+                  <input type="hidden" id="sales-label-print-toggle" value="off">
                 </div>
               </div>
             </div>
@@ -1159,6 +1218,6 @@
   </style>
 
   <!-- ERP Logic Script -->
-  <script src="/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

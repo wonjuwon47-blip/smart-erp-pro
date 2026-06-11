@@ -370,10 +370,6 @@ td {
 
 /* Print stylesheet for A5 Landscape invoice size */
 @media print {
-  @page {
-    size: A5 landscape;
-    margin: 5mm 8mm;
-  }
   body * {
     visibility: hidden;
   }
