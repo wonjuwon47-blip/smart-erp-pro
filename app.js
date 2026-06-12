@@ -6378,7 +6378,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnDailyVerifPrint) {
     btnDailyVerifPrint.addEventListener("click", () => {
-      window.print();
+      const printArea = document.getElementById("print-document-area");
+      if (printArea) {
+        // 기존 인쇄 내용 임시 보관
+        const oldHtml = printArea.innerHTML;
+        
+        // 일일 품목확인서 인쇄 영역 내용을 복사하여 주입
+        printArea.innerHTML = dailyVerifPrintArea.innerHTML;
+        
+        // 인쇄 호출
+        window.print();
+        
+        // 인쇄 후 복원
+        printArea.innerHTML = oldHtml;
+      } else {
+        window.print();
+      }
     });
   }
 

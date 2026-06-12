@@ -1560,42 +1560,27 @@
 
     /* 인쇄 모드 전용 스타일 */
     @media print {
-      /* 인쇄 대상 이외의 주요 레이아웃 요소를 감춤 */
-      aside.sidebar,
-      header.header-bar,
-      #tab-daily-verification > .card:first-child,
-      .no-print {
-        display: none !important;
-      }
-
-      /* 인쇄 대상의 부모 요소들이 정상 노출 및 백그라운드 색상을 가지도록 조정 */
-      body, .app-layout, main.main-content, #tab-daily-verification {
+      /* style.css에 정의된 body > *:not(#print-document-area) { display: none !important; } 가 적용되므로
+         우리는 #print-document-area 내에 복제되어 들어갈 요소들의 스타일만 정의합니다. */
+      
+      #print-document-area {
+        display: block !important;
         background: #fff !important;
         color: #000 !important;
         margin: 0 !important;
         padding: 0 !important;
-        border: none !important;
         width: 100% !important;
         height: auto !important;
-        display: block !important;
-        position: static !important;
-        box-shadow: none !important;
-      }
-
-      #daily-verif-print-area {
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
       }
 
       .daily-verif-page {
         page-break-after: always;
         background: #fff !important;
         border: none !important;
-        padding: 0;
-        margin: 0 0 15mm 0;
+        padding: 0 !important;
+        margin: 0 0 15mm 0 !important;
         color: #000 !important;
+        display: block !important;
       }
       .daily-verif-title {
         color: #000 !important;
@@ -1610,6 +1595,7 @@
       .daily-verif-table {
         color: #000 !important;
         table-layout: fixed !important;
+        width: 100% !important;
       }
       .daily-verif-table th, .daily-verif-table td {
         height: 38px !important;
