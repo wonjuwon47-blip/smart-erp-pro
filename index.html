@@ -1496,12 +1496,17 @@
       font-size: 0.78rem;
       color: #fff;
       background: transparent;
+      table-layout: fixed;
     }
     .daily-verif-table th, .daily-verif-table td {
       border: 1px solid rgba(255, 255, 255, 0.15);
       padding: 6px 4px;
-      height: 28px;
+      height: 38px !important;
+      width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
       box-sizing: border-box;
+      outline: none;
+      word-break: break-all;
+      overflow: hidden;
     }
     /* 2열 마다 우측에 붉은색 경계선 강조 */
     .daily-verif-table th:nth-child(2n+1), 
@@ -1566,6 +1571,11 @@
       }
       .daily-verif-table {
         color: #000 !important;
+        table-layout: fixed !important;
+      }
+      .daily-verif-table th, .daily-verif-table td {
+        height: 38px !important;
+        width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
       }
       .daily-verif-table th {
         background: #e5e7eb !important;

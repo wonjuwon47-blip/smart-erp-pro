@@ -6430,6 +6430,61 @@ document.addEventListener("DOMContentLoaded", () => {
     return summary;
   }
 
+  // --- 일일 품목확인서 품목 통합 및 수량 파싱 헬퍼 ---
+  function parseAndNormalizeProduct(itemName) {
+    if (!itemName) return { name: "", prefix: "" };
+    const name = String(itemName).trim();
+    
+    // 감자 통합 규칙
+    if (name.includes("감자")) {
+      if (name.includes("친환경")) {
+        return { name: "감자", prefix: "친" };
+      }
+      return { name: "감자", prefix: "" };
+    }
+    
+    // 생강 통합 규칙
+    if (name.includes("생강")) {
+      if (name.includes("깐")) {
+        return { name: "생강", prefix: "깐" };
+      }
+      return { name: "생강", prefix: "" };
+    }
+    
+    return { name: name, prefix: "" };
+  }
+
+  function parseQtyString(str) {
+    const result = {};
+    if (!str) return result;
+    const tokens = String(str).split(/[\s,\/]+/);
+    tokens.forEach(token => {
+      const t = token.trim();
+      if (!t) return;
+      const match = t.match(/^([가-힣a-zA-Z]*)([0-9\.]+)/);
+      if (match) {
+        const pref = match[1] || "";
+        const val = parseFloat(match[2]) || 0;
+        result[pref] = (result[pref] || 0) + val;
+      }
+    });
+    return result;
+  }
+
+  function renderCellQty(qtyMap) {
+    if (!qtyMap) return "";
+    const parts = [];
+    if (qtyMap[""] > 0) {
+      parts.push(qtyMap[""]);
+    }
+    Object.keys(qtyMap).forEach(pref => {
+      if (pref !== "" && qtyMap[pref] > 0) {
+        parts.push(`${pref}${qtyMap[pref]}`);
+      }
+    });
+    return parts.join(" ");
+  }
+
   function formatVerifHeaderDate(dateStr) {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -6444,39 +6499,47 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderDailyVerification(data, date) {
     const safeData = data || [];
     
-    // 유효한 학교 및 물품 목록
+    // 유효한 학교 목록 추출 및 정렬
     const validSchools = [...new Set(safeData.map(d => d.partner_name))].sort().filter(Boolean);
-    const validProducts = [...new Set(safeData.map(d => d.item_name))].sort().filter(Boolean);
+    
+    // 물품 목록은 통합된 이름(normalizedName)으로 추출 및 정렬
+    const normalizedProducts = [...new Set(safeData.map(d => parseAndNormalizeProduct(d.item_name).name))].sort().filter(Boolean);
 
-    // 피벗 맵 (유효값 기준)
+    // 피벗 맵 (물품, 학교) -> { prefix: qty }
     const pivotMap = {};
-    validProducts.forEach(p => {
+    normalizedProducts.forEach(p => {
       pivotMap[p] = {};
       validSchools.forEach(s => {
-        pivotMap[p][s] = 0;
+        pivotMap[p][s] = {};
       });
     });
 
     safeData.forEach(d => {
-      if (d.item_name && d.partner_name && pivotMap[d.item_name] && pivotMap[d.item_name][d.partner_name] !== undefined) {
-        pivotMap[d.item_name][d.partner_name] += Number(d.qty) || 0;
+      if (d.item_name && d.partner_name) {
+        const norm = parseAndNormalizeProduct(d.item_name);
+        if (pivotMap[norm.name] && pivotMap[norm.name][d.partner_name] !== undefined) {
+          const schoolMap = pivotMap[norm.name][d.partner_name];
+          schoolMap[norm.prefix] = (schoolMap[norm.prefix] || 0) + (Number(d.qty) || 0);
+        }
       }
     });
 
-    // 물품별 합계 (유효값 기준)
+    // 물품별 접두사별 전체 합계
     const productTotals = {};
-    validProducts.forEach(p => {
-      let sum = 0;
+    normalizedProducts.forEach(p => {
+      productTotals[p] = {};
       validSchools.forEach(s => {
-        sum += pivotMap[p][s];
+        const schoolMap = pivotMap[p][s];
+        Object.keys(schoolMap).forEach(pref => {
+          productTotals[p][pref] = (productTotals[p][pref] || 0) + schoolMap[pref];
+        });
       });
-      productTotals[p] = sum;
     });
 
     const ROWS_PER_PAGE = 35;
     const COLS_PER_PAGE = 12;
 
-    // 12열씩 쪼개고, 모자라면 빈 칸 채워 12열 유지
+    // 학교 그룹 및 12열 패딩
     const schoolGroups = [];
     for (let i = 0; i < validSchools.length; i += COLS_PER_PAGE) {
       const group = validSchools.slice(i, i + COLS_PER_PAGE);
@@ -6489,10 +6552,10 @@ document.addEventListener("DOMContentLoaded", () => {
       schoolGroups.push(Array(COLS_PER_PAGE).fill(""));
     }
 
-    // 35행씩 쪼개고, 모자라면 빈 칸 채워 35행 유지
+    // 물품 그룹 및 35행 패딩
     const productGroups = [];
-    for (let i = 0; i < validProducts.length; i += ROWS_PER_PAGE) {
-      const group = validProducts.slice(i, i + ROWS_PER_PAGE);
+    for (let i = 0; i < normalizedProducts.length; i += ROWS_PER_PAGE) {
+      const group = normalizedProducts.slice(i, i + ROWS_PER_PAGE);
       while (group.length < ROWS_PER_PAGE) {
         group.push("");
       }
@@ -6514,7 +6577,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const pageDiv = document.createElement("div");
         pageDiv.className = "daily-verif-page";
         
-        // 일일발주서.xlsx 디자인 모사: 밑줄이 그어진 큰 제목과 우측 날짜+페이지 구성
         let html = `
           <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;" class="daily-verif-excel-header">
             <div class="daily-verif-title" style="margin: 0; font-size: 1.5rem; font-weight: bold; color: #fff; text-decoration: underline; text-underline-offset: 4px;">일일 품목확인서</div>
@@ -6525,15 +6587,15 @@ document.addEventListener("DOMContentLoaded", () => {
           <table class="daily-verif-table">
             <thead>
               <tr>
-                <th style="width: 180px; height: 45px; font-size: 0.82rem; font-weight: bold; line-height: 1.2;">학교명<br><br>품목</th>
+                <th contenteditable="true" style="font-size: 0.82rem; font-weight: bold; line-height: 1.2;">학교명<br><br>품목</th>
         `;
 
         schoolGroup.forEach(school => {
-          html += `<th style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
+          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
         });
         
         html += `
-                <th style="width: 80px; vertical-align: middle;">합계</th>
+                <th contenteditable="true" style="vertical-align: middle;">합계</th>
               </tr>
             </thead>
             <tbody>
@@ -6543,30 +6605,30 @@ document.addEventListener("DOMContentLoaded", () => {
           if (product !== "") {
             html += `
               <tr>
-                <td class="row-header">${escapeHtml(product)}</td>
+                <td contenteditable="true" class="row-header">${escapeHtml(product)}</td>
             `;
 
             schoolGroup.forEach(school => {
               if (school !== "") {
-                const qty = pivotMap[product][school];
-                html += `<td>${qty > 0 ? qty : ""}</td>`;
+                const valStr = renderCellQty(pivotMap[product][school]);
+                html += `<td contenteditable="true" class="qty-cell">${valStr}</td>`;
               } else {
-                html += `<td></td>`;
+                html += `<td contenteditable="true" class="qty-cell"></td>`;
               }
             });
 
-            const total = productTotals[product];
-            html += `<td class="col-total">${total > 0 ? total : ""}</td></tr>`;
+            const totalStr = renderCellQty(productTotals[product]);
+            html += `<td contenteditable="true" class="col-total">${totalStr}</td></tr>`;
           } else {
-            // 빈 행 35행 고정 렌더링
+            // 빈 행 렌더링
             html += `
               <tr>
-                <td class="row-header"></td>
+                <td contenteditable="true" class="row-header"></td>
             `;
             schoolGroup.forEach(() => {
-              html += `<td></td>`;
+              html += `<td contenteditable="true" class="qty-cell"></td>`;
             });
-            html += `<td class="col-total"></td></tr>`;
+            html += `<td contenteditable="true" class="col-total"></td></tr>`;
           }
         });
 
@@ -6574,15 +6636,15 @@ document.addEventListener("DOMContentLoaded", () => {
             </tbody>
             <tfoot>
               <tr>
-                <th style="height: 45px; font-size: 0.82rem; font-weight: bold; line-height: 1.2;">학교명<br><br>품목</th>
+                <th contenteditable="true" style="font-size: 0.82rem; font-weight: bold; line-height: 1.2;">학교명<br><br>품목</th>
         `;
 
         schoolGroup.forEach(school => {
-          html += `<th style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
+          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
         });
 
         html += `
-                <th style="vertical-align: middle;">합계</th>
+                <th contenteditable="true" style="vertical-align: middle;">합계</th>
               </tr>
             </tfoot>
           </table>
@@ -6590,6 +6652,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
         pageDiv.innerHTML = html;
         dailyVerifPrintArea.appendChild(pageDiv);
+
+        // 실시간 수량 합산 계산 이벤트 바인딩
+        const table = pageDiv.querySelector(".daily-verif-table");
+        if (table) {
+          table.addEventListener("input", (e) => {
+            if (e.target.classList.contains("qty-cell")) {
+              const tr = e.target.closest("tr");
+              if (!tr) return;
+              
+              const rowTotals = {};
+              tr.querySelectorAll(".qty-cell").forEach(cell => {
+                const cellQty = parseQtyString(cell.textContent);
+                Object.keys(cellQty).forEach(pref => {
+                  rowTotals[pref] = (rowTotals[pref] || 0) + cellQty[pref];
+                });
+              });
+              
+              const totalTd = tr.querySelector(".col-total");
+              if (totalTd) {
+                totalTd.textContent = renderCellQty(rowTotals);
+              }
+            }
+          });
+        }
       });
     });
 
