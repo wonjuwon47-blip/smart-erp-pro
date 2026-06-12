@@ -888,7 +888,7 @@ router.get('/settings', async (req, res) => {
 
 router.post('/settings', async (req, res) => {
   const companyId = req.user.company_id;
-  const { paperSize, marginTop, marginLeft, fontSize, logoText, hkF2, hkF4, hkF7, hkF8, hkF9, activeHqId, uploadedFilesJson } = req.body;
+  const { paperSize, marginTop, marginLeft, fontSize, logoText, hkF2, hkF4, hkF7, hkF8, hkF9, activeHqId, uploadedFilesJson, lastUpdated } = req.body;
 
   try {
     const existing = await db.query("SELECT company_id FROM settings WHERE company_id = ?", [companyId]);
@@ -897,7 +897,7 @@ router.post('/settings', async (req, res) => {
     }
 
     await db.execute(
-      "UPDATE settings SET paper_size = ?, margin_top = ?, margin_left = ?, font_size = ?, logo_text = ?, hk_f2 = ?, hk_f4 = ?, hk_f7 = ?, hk_f8 = ?, hk_f9 = ?, active_hq_id = ?, uploaded_files_json = ? WHERE company_id = ?",
+      "UPDATE settings SET paper_size = ?, margin_top = ?, margin_left = ?, font_size = ?, logo_text = ?, hk_f2 = ?, hk_f4 = ?, hk_f7 = ?, hk_f8 = ?, hk_f9 = ?, active_hq_id = ?, uploaded_files_json = ?, last_updated = ? WHERE company_id = ?",
       [
         paperSize || 'A4',
         parseInt(marginTop, 10) || 15,
@@ -911,6 +911,7 @@ router.post('/settings', async (req, res) => {
         hkF9 || 'excel-import',
         activeHqId !== undefined ? parseInt(activeHqId, 10) : null,
         uploadedFilesJson || null,
+        parseInt(lastUpdated, 10) || 0,
         companyId
       ]
     );
@@ -1108,8 +1109,8 @@ router.post('/backup/import', async (req, res) => {
     if (backup.settings) {
       const s = backup.settings;
       await db.execute(
-        "INSERT INTO settings (company_id, paper_size, margin_top, margin_left, font_size, logo_text, hk_f2, hk_f4, hk_f7, hk_f8, hk_f9, active_hq_id, uploaded_files_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [companyId, s.paper_size || 'A4', s.margin_top || 15, s.margin_left || 15, s.font_size || 10, s.logo_text || '[공급자 보관용]', s.hk_f2 || 'sales', s.hk_f4 || 'save', s.hk_f7 || 'purchase', s.hk_f8 || 'receivables', s.hk_f9 || 'excel-import', s.active_hq_id, s.uploaded_files_json || null]
+        "INSERT INTO settings (company_id, paper_size, margin_top, margin_left, font_size, logo_text, hk_f2, hk_f4, hk_f7, hk_f8, hk_f9, active_hq_id, uploaded_files_json, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [companyId, s.paper_size || 'A4', s.margin_top || 15, s.margin_left || 15, s.font_size || 10, s.logo_text || '[공급자 보관용]', s.hk_f2 || 'sales', s.hk_f4 || 'save', s.hk_f7 || 'purchase', s.hk_f8 || 'receivables', s.hk_f9 || 'excel-import', s.active_hq_id, s.uploaded_files_json || null, s.last_updated || 0]
       );
     }
 

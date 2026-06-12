@@ -329,13 +329,19 @@ async function initDb() {
         hk_f8 VARCHAR(50) DEFAULT 'receivables',
         hk_f9 VARCHAR(50) DEFAULT 'excel-import',
         active_hq_id INTEGER DEFAULT NULL,
-        uploaded_files_json TEXT DEFAULT NULL
+        uploaded_files_json TEXT DEFAULT NULL,
+        last_updated NUMERIC DEFAULT 0
       )
     `);
 
     // 기존 데이터베이스 호환성 확보를 위한 컬럼 강제 추가 시도
     try {
       await execute("ALTER TABLE settings ADD COLUMN uploaded_files_json TEXT");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
+    try {
+      await execute("ALTER TABLE settings ADD COLUMN last_updated NUMERIC DEFAULT 0");
     } catch (e) {
       // 이미 컬럼이 존재하면 정상 패스
     }

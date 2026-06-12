@@ -343,6 +343,7 @@ let isSyncing = false;
 function saveDb() {
   if (db.settings) {
     db.settings.uploadedFilesJson = JSON.stringify(db.uploadedSchoolFiles || []);
+    db.settings.lastUpdated = Date.now();
   }
   prepareInvoicesForSync();
   localStorage.setItem("erp_db_pro", JSON.stringify(db));
@@ -463,6 +464,46 @@ async function syncFromCloud() {
   } catch (err) {
     console.error("클라우드 데이터 로드 네트워크 오류:", err);
   } finally {
+    isSyncing = false;
+  }
+}
+
+async function smartSync() {
+  const token = localStorage.getItem("erp_jwt_token");
+  if (!token || isSyncing) return;
+  
+  isSyncing = true;
+  try {
+    const response = await fetch("/api/erp/backup/export", {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      isSyncing = false;
+      return;
+    }
+    
+    const serverData = await response.json();
+    const serverLastUpdated = (serverData.settings && serverData.settings.last_updated) 
+      ? Number(serverData.settings.last_updated) 
+      : 0;
+    const localLastUpdated = (db.settings && db.settings.lastUpdated) 
+      ? Number(db.settings.lastUpdated) 
+      : 0;
+    
+    if (serverLastUpdated > localLastUpdated) {
+      console.log("클라우드 서버가 더 최신입니다. 서버에서 데이터를 가져옵니다. (Server: " + serverLastUpdated + ", Local: " + localLastUpdated + ")");
+      isSyncing = false;
+      await syncFromCloud();
+    } else if (localLastUpdated > serverLastUpdated) {
+      console.log("로컬 데이터가 더 최신입니다. 서버로 백업을 전송합니다. (Local: " + localLastUpdated + ", Server: " + serverLastUpdated + ")");
+      isSyncing = false;
+      await syncToCloud();
+    } else {
+      console.log("로컬과 클라우드 데이터가 완벽히 일치합니다. (Timestamp: " + localLastUpdated + ")");
+      isSyncing = false;
+    }
+  } catch (e) {
+    console.error("스마트 동기화 처리 중 네트워크 에러:", e);
     isSyncing = false;
   }
 }
@@ -5520,7 +5561,7 @@ document.addEventListener("DOMContentLoaded", () => {
             updateCloudSyncStatusUI();
             authOverlay.style.display = "none";
             
-            await syncFromCloud();
+            await smartSync();
             alert(`${data.user.companyName}의 ERP 원장이 동기화되었습니다.`);
           } else {
             authErrorMsg.textContent = data.error || "로그인 정보가 올바르지 않습니다.";
@@ -5570,8 +5611,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else {
         alert("클라우드와 실시간 동기화를 시작합니다.");
-        await syncFromCloud();
-        await syncToCloud();
+        await smartSync();
         updateCloudSyncStatusUI();
       }
     });
@@ -5605,7 +5645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateLoginStatusUI(data.user);
         updateCloudSyncStatusUI();
         authOverlay.style.display = "none";
-        await syncFromCloud();
+        await smartSync();
       } else {
         localStorage.removeItem("erp_jwt_token");
         localStorage.removeItem("erp_user_info");
@@ -5635,7 +5675,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const token = localStorage.getItem("erp_jwt_token");
       if (!token || isSyncing) return;
       
-      // 사용자가 무언가를 활발히 편집 중인 경우는 UI 갱신으로 인한 충돌 방지
       const isUserEditing = (
         editingSalesId !== null || 
         editingPurchaseId !== null || 
@@ -5645,8 +5684,8 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       
       if (!isUserEditing) {
-        console.log("백그라운드 자동 동기화 실행 중...");
-        await syncFromCloud();
+        console.log("백그라운드 자동 스마트 동기화 실행 중...");
+        await smartSync();
       }
     }, 15000);
 
@@ -5664,8 +5703,17 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       if (!isUserEditing) {
-        console.log("포커스 획득에 따른 동기화 실행 중...");
-        await syncFromCloud();
+        console.log("포커스 획득에 따른 스마트 동기화 실행 중...");
+        await smartSync();
+      }
+    });
+
+    // 브라우저 닫거나 나갈 때 실시간 강제 업로드
+    window.addEventListener("beforeunload", () => {
+      const token = localStorage.getItem("erp_jwt_token");
+      if (token && !isSyncing) {
+        // 동기 응답 방해를 최소화하도록 백그라운드로 전송 트리거
+        syncToCloud();
       }
     });
   }
