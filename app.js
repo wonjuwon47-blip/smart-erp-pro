@@ -1918,8 +1918,10 @@ function triggerLabelPrintDoc(sale) {
   `);
   const printArea = document.getElementById("print-document-area");
   printArea.innerHTML = getLabelHtml(sale);
-  window.print();
-  clearPrintStyle();
+  setTimeout(() => {
+    window.print();
+    setTimeout(clearPrintStyle, 2000);
+  }, 150);
 }
 
 function triggerInvoicePrintDoc(sale) {
@@ -2194,8 +2196,10 @@ function triggerInvoicePrintDoc(sale) {
     }
   `);
   printArea.innerHTML = fullHtml;
-  window.print();
-  clearPrintStyle();
+  setTimeout(() => {
+    window.print();
+    setTimeout(clearPrintStyle, 2000);
+  }, 150);
 }
 
 async function handleSalesPrint(sale, isLabelOn) {
@@ -2478,8 +2482,10 @@ function triggerPurchaseInvoicePrintDoc(pur) {
     }
   `);
   printArea.innerHTML = fullHtml;
-  window.print();
-  clearPrintStyle();
+  setTimeout(() => {
+    window.print();
+    setTimeout(clearPrintStyle, 2000);
+  }, 150);
 }
 
 function renderSalesList() {
@@ -3087,8 +3093,10 @@ function triggerEstimatePrintDoc(est) {
       }
     }
   `);
-  window.print();
-  clearPrintStyle();
+  setTimeout(() => {
+    window.print();
+    setTimeout(clearPrintStyle, 2000);
+  }, 150);
 }
 
 // --- 9. 외상대금 및 미수금 수금/지급장 관리 ---
