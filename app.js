@@ -1015,10 +1015,6 @@ if(formPartner) {
   });
 }
 
-if(partnerSearchInput) {
-  partnerSearchInput.addEventListener("input", renderPartners);
-}
-
 window.editPartner = function(idx) {
   const p = db.partners[idx];
   if (!p) return;
