@@ -170,6 +170,11 @@
         </div>
         <div style="display: flex; align-items: center; gap: 16px;">
           <div class="form-group" style="margin-bottom: 0;">
+            <select id="company-branch-selector" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(167, 139, 250, 0.25); border: 1px solid rgba(167, 139, 250, 0.5); border-radius: 6px; color: #fff; outline: none; display: none;">
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
             <select id="active-hq-selector" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(167, 139, 250, 0.15); border-color: var(--primary-color);">
               <!-- Loaded dynamically -->
             </select>
@@ -247,6 +252,7 @@
         <div class="card">
           <div class="inner-tabs">
             <div class="inner-tab active" data-subtab="subtab-hq-settings">본사/지사 정보 등록</div>
+            <div id="tab-btn-branch-settings" class="inner-tab" data-subtab="subtab-branch-settings" style="display: none;">지사(지점) 관리</div>
             <div class="inner-tab" data-subtab="subtab-employee-settings">사원 정보 관리</div>
             <div class="inner-tab" data-subtab="subtab-bank-settings">은행 계좌 관리</div>
           </div>
@@ -305,6 +311,38 @@
                   </tr>
                 </thead>
                 <tbody id="hq-list-rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Subtab: 지사(지점) 관리 -->
+          <div id="subtab-branch-settings" class="inner-tab-content">
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">본사의 하위 지사(지점)를 새로 생성하여 다중 계정 체계를 관리합니다.</p>
+            <form id="form-branch-add" style="margin-bottom: 24px;">
+              <div class="form-grid" style="grid-template-columns: 2fr 1fr; gap: 12px; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>지사(지점) 상호명</label>
+                  <input type="text" id="branch-add-name" placeholder="예: (주)푸드유통 서울강남점" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="height: 38px;"><i data-lucide="plus"></i> 신규 지사 개설</button>
+              </div>
+            </form>
+
+            <h3>등록된 하위 지사 목록</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>지사 번호(ID)</th>
+                    <th>지점 상호명</th>
+                    <th>개설일자</th>
+                  </tr>
+                </thead>
+                <tbody id="branch-list-rows">
+                  <tr>
+                    <td colspan="3" style="text-align: center; color: var(--text-muted);">등록된 지사 정보가 없습니다.</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>

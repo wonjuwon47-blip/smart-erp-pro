@@ -53,7 +53,7 @@ router.post('/login', async (req, res) => {
   try {
     // 1. 유저 조회
     const users = await db.query(
-      "SELECT u.*, c.name AS company_name FROM users u JOIN companies c ON u.company_id = c.id WHERE u.username = ?",
+      "SELECT u.*, c.name AS company_name, c.parent_id FROM users u JOIN companies c ON u.company_id = c.id WHERE u.username = ?",
       [username]
     );
 
@@ -69,7 +69,14 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: "존재하지 않는 아이디이거나 비밀번호가 틀렸습니다." });
     }
 
-    // 3. JWT 토큰 서명
+    // 3. 사용자가 전환 가능한 본사 및 모든 지사 목록 조회
+    const rootCompanyId = user.parent_id || user.company_id;
+    const branches = await db.query(
+      "SELECT id, name, parent_id FROM companies WHERE id = ? OR parent_id = ? ORDER BY parent_id ASC, id ASC",
+      [rootCompanyId, rootCompanyId]
+    );
+
+    // 4. JWT 토큰 서명
     const token = jwt.sign(
       {
         id: user.id,
@@ -91,8 +98,14 @@ router.post('/login', async (req, res) => {
         name: user.name,
         companyId: user.company_id,
         companyName: user.company_name,
+        rootCompanyId: rootCompanyId,
         role: user.role
-      }
+      },
+      branches: branches.map(b => ({
+        id: b.id,
+        name: b.name,
+        isParent: b.parent_id === null || b.parent_id === undefined
+      }))
     });
   } catch (err) {
     console.error("Login Error:", err);
@@ -103,8 +116,18 @@ router.post('/login', async (req, res) => {
 // 내 정보 세션 확인 API
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const companies = await db.query("SELECT name FROM companies WHERE id = ?", [req.user.company_id]);
+    const rootCompanyId = req.user.root_company_id;
+    
+    // 1. 사용자가 전환 가능한 본사 및 모든 지사 목록 조회
+    const branches = await db.query(
+      "SELECT id, name, parent_id FROM companies WHERE id = ? OR parent_id = ? ORDER BY parent_id ASC, id ASC",
+      [rootCompanyId, rootCompanyId]
+    );
+
+    // 2. 현재 활성화된 세션 회사 정보 조회
+    const companies = await db.query("SELECT name, parent_id FROM companies WHERE id = ?", [req.user.company_id]);
     const companyName = companies.length > 0 ? companies[0].name : "미지정 회사";
+    const isBranch = companies.length > 0 ? (companies[0].parent_id !== null && companies[0].parent_id !== undefined) : false;
     
     res.json({
       success: true,
@@ -114,8 +137,15 @@ router.get('/me', authMiddleware, async (req, res) => {
         name: req.user.name,
         companyId: req.user.company_id,
         companyName: companyName,
+        rootCompanyId: rootCompanyId,
+        isBranch: isBranch,
         role: req.user.role
-      }
+      },
+      branches: branches.map(b => ({
+        id: b.id,
+        name: b.name,
+        isParent: b.parent_id === null || b.parent_id === undefined
+      }))
     });
   } catch (err) {
     console.error("Session profile load error:", err);

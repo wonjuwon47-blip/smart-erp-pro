@@ -165,6 +165,7 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS companies (
         id ${pkType},
         name VARCHAR(100) NOT NULL,
+        parent_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -369,6 +370,11 @@ async function initDb() {
     `);
 
     // 기존 데이터베이스 호환성 확보를 위한 컬럼 강제 추가 시도
+    try {
+      await execute("ALTER TABLE companies ADD COLUMN parent_id INTEGER");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
     try {
       await execute("ALTER TABLE settings ADD COLUMN uploaded_files_json TEXT");
     } catch (e) {

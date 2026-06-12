@@ -15,7 +15,7 @@ router.get('/partners', async (req, res) => {
   try {
     const partners = await db.query(
       "SELECT * FROM partners WHERE company_id = ? ORDER BY id DESC",
-      [req.user.company_id]
+      [req.user.root_company_id]
     );
     res.json(partners);
   } catch (err) {
@@ -36,7 +36,7 @@ router.post('/partners', async (req, res) => {
     // 동일 회사 내 코드 중복 조회
     const existing = await db.query(
       "SELECT id FROM partners WHERE company_id = ? AND code = ?",
-      [req.user.company_id, code]
+      [req.user.root_company_id, code]
     );
     if (existing.length > 0) {
       return res.status(400).json({ error: "이미 등록된 거래처 코드입니다." });
@@ -44,7 +44,7 @@ router.post('/partners', async (req, res) => {
 
     const partnerId = await db.executeInsert(
       "INSERT INTO partners (company_id, code, name, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.user.company_id, code, name, owner || '', bizNo || '', address || '', phone || '', type]
+      [req.user.root_company_id, code, name, owner || '', bizNo || '', address || '', phone || '', type]
     );
 
     res.status(201).json({ success: true, id: partnerId, message: "거래처가 성공적으로 등록되었습니다." });
@@ -63,7 +63,7 @@ router.put('/partners/:id', async (req, res) => {
     // 소유권 검사
     const target = await db.query(
       "SELECT id FROM partners WHERE company_id = ? AND id = ?",
-      [req.user.company_id, partnerId]
+      [req.user.root_company_id, partnerId]
     );
     if (target.length === 0) {
       return res.status(404).json({ error: "해당 거래처 정보를 찾을 수 없거나 수정 권한이 없습니다." });
@@ -88,7 +88,7 @@ router.delete('/partners/:id', async (req, res) => {
   try {
     const target = await db.query(
       "SELECT id FROM partners WHERE company_id = ? AND id = ?",
-      [req.user.company_id, partnerId]
+      [req.user.root_company_id, partnerId]
     );
     if (target.length === 0) {
       return res.status(404).json({ error: "해당 거래처 정보를 찾을 수 없거나 삭제 권한이 없습니다." });
@@ -112,7 +112,7 @@ router.get('/products', async (req, res) => {
   try {
     const products = await db.query(
       "SELECT * FROM products WHERE company_id = ? ORDER BY id DESC",
-      [req.user.company_id]
+      [req.user.root_company_id]
     );
     res.json(products);
   } catch (err) {
@@ -133,7 +133,7 @@ router.post('/products', async (req, res) => {
     // 중복 코드 체크
     const existing = await db.query(
       "SELECT id FROM products WHERE company_id = ? AND code = ?",
-      [req.user.company_id, code]
+      [req.user.root_company_id, code]
     );
     if (existing.length > 0) {
       return res.status(400).json({ error: "이미 존재하는 품목 코드입니다." });
@@ -142,7 +142,7 @@ router.post('/products', async (req, res) => {
     const productId = await db.executeInsert(
       "INSERT INTO products (company_id, code, name, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
-        req.user.company_id,
+        req.user.root_company_id,
         code,
         name,
         unit || 'EA',
@@ -169,7 +169,7 @@ router.put('/products/:id', async (req, res) => {
   try {
     const target = await db.query(
       "SELECT id FROM products WHERE company_id = ? AND id = ?",
-      [req.user.company_id, productId]
+      [req.user.root_company_id, productId]
     );
     if (target.length === 0) {
       return res.status(404).json({ error: "해당 상품 정보를 찾을 수 없거나 수정 권한이 없습니다." });
@@ -204,7 +204,7 @@ router.delete('/products/:id', async (req, res) => {
   try {
     const target = await db.query(
       "SELECT id FROM products WHERE company_id = ? AND id = ?",
-      [req.user.company_id, productId]
+      [req.user.root_company_id, productId]
     );
     if (target.length === 0) {
       return res.status(404).json({ error: "해당 상품 정보를 찾을 수 없거나 삭제 권한이 없습니다." });
@@ -327,7 +327,7 @@ router.post('/invoices', async (req, res) => {
       const qtyChange = type === 'purchase' ? parseFloat(item.qty) : -parseFloat(item.qty);
       await db.execute(
         "UPDATE products SET stock = stock + ? WHERE company_id = ? AND name = ?",
-        [qtyChange, req.user.company_id, item.name]
+        [qtyChange, req.user.root_company_id, item.name]
       );
     }
 
@@ -364,7 +364,7 @@ router.put('/invoices/:id', async (req, res) => {
       const rollbackQty = origType === 'purchase' ? -parseFloat(oldItem.qty) : parseFloat(oldItem.qty);
       await db.execute(
         "UPDATE products SET stock = stock + ? WHERE company_id = ? AND name = ?",
-        [rollbackQty, req.user.company_id, oldItem.name]
+        [rollbackQty, req.user.root_company_id, oldItem.name]
       );
     }
 
@@ -406,7 +406,7 @@ router.put('/invoices/:id', async (req, res) => {
       const newQtyChange = origType === 'purchase' ? parseFloat(item.qty) : -parseFloat(item.qty);
       await db.execute(
         "UPDATE products SET stock = stock + ? WHERE company_id = ? AND name = ?",
-        [newQtyChange, req.user.company_id, item.name]
+        [newQtyChange, req.user.root_company_id, item.name]
       );
     }
 
@@ -437,7 +437,7 @@ router.delete('/invoices/:id', async (req, res) => {
       const rollbackQty = origType === 'purchase' ? -parseFloat(oldItem.qty) : parseFloat(oldItem.qty);
       await db.execute(
         "UPDATE products SET stock = stock + ? WHERE company_id = ? AND name = ?",
-        [rollbackQty, req.user.company_id, oldItem.name]
+        [rollbackQty, req.user.root_company_id, oldItem.name]
       );
     }
 
@@ -732,9 +732,10 @@ router.delete('/estimates/:id', async (req, res) => {
 router.get('/receivables-payments', async (req, res) => {
   try {
     const companyId = req.user.company_id;
+    const rootCompanyId = req.user.root_company_id;
 
-    // 1. 거래처 목록 가져오기
-    const partners = await db.query("SELECT * FROM partners WHERE company_id = ?", [companyId]);
+    // 1. 거래처 목록 가져오기 (공통 거래처 조회)
+    const partners = await db.query("SELECT * FROM partners WHERE company_id = ?", [rootCompanyId]);
 
     // 2. 각 거래처의 외상(청구) 매출 합산
     const rawSales = await db.query(
@@ -1152,6 +1153,73 @@ router.post('/backup/reset', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "데이터 초기화 실패" });
+  }
+});
+
+// ==========================================
+// 11. 지사(Branches) 관리 API
+// ==========================================
+
+// 현재 본사 그룹 하위의 지사 목록 조회
+router.get('/branches', async (req, res) => {
+  try {
+    const rootCompanyId = req.user.root_company_id;
+    const branches = await db.query(
+      "SELECT id, name, created_at FROM companies WHERE parent_id = ? ORDER BY id ASC",
+      [rootCompanyId]
+    );
+    res.json(branches);
+  } catch (err) {
+    console.error("Fetch branches error:", err);
+    res.status(500).json({ error: "지사 목록을 조회하지 못했습니다." });
+  }
+});
+
+// 신규 지사 등록
+router.post('/branches', async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "지사 상호명을 입력해 주세요." });
+  }
+
+  // 본사 권한 확인 (현재 활성화된 회사ID가 본사ID와 같아야 함)
+  if (req.user.company_id !== req.user.root_company_id) {
+    return res.status(403).json({ error: "지사 생성 권한은 본사 계정에게만 부여됩니다." });
+  }
+
+  try {
+    const rootCompanyId = req.user.root_company_id;
+    // 동일 이름 지사 중복 체크
+    const existing = await db.query(
+      "SELECT id FROM companies WHERE parent_id = ? AND name = ?",
+      [rootCompanyId, name]
+    );
+    if (existing.length > 0) {
+      return res.status(400).json({ error: "이미 동일한 이름으로 등록된 지사가 존재합니다." });
+    }
+
+    // 신규 지사 등록
+    const branchId = await db.executeInsert(
+      "INSERT INTO companies (name, parent_id) VALUES (?, ?)",
+      [name, rootCompanyId]
+    );
+
+    // 신규 지사의 기본 본사(사업소) 1개 자동 생성
+    const defaultHqId = await db.executeInsert(
+      "INSERT INTO headquarters (company_id, name, reg_no, owner, address, phone, business) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [branchId, name + " 사업소", "000-00-00000", "대표자명", "서울특별시", "02-1234-5678", "도소매 / 농수산물"]
+    );
+
+    // 신규 지사의 기본 설정 등록
+    await db.execute(
+      "INSERT INTO settings (company_id, active_hq_id) VALUES (?, ?)",
+      [branchId, defaultHqId]
+    );
+
+    res.status(201).json({ success: true, id: branchId, message: "지사 등록 및 기본 설정이 준비되었습니다." });
+  } catch (err) {
+    console.error("Create branch error:", err);
+    res.status(500).json({ error: "지사 등록 과정에서 서버 오류가 발생했습니다." });
   }
 });
 

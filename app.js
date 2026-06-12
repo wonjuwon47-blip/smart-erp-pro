@@ -17,6 +17,17 @@ const INLINE_INPUT_STYLE = "background:rgba(0,0,0,0.2); border:1px solid rgba(25
 // --- 실서버 통신용 절대 경로 Base URL 설정 (로컬 파일 index.html 기동 대응) ---
 const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'https://smart-erp-pro-24pu.onrender.com' : '';
 
+// --- 전역 Fetch 인터셉터 (본사/지사 전환용 헤더 삽입) ---
+const originalFetch = window.fetch;
+window.fetch = async function (url, options = {}) {
+  const activeCompanyId = localStorage.getItem("erp_active_company_id");
+  if (activeCompanyId) {
+    options.headers = options.headers || {};
+    options.headers["X-Active-Company-Id"] = activeCompanyId;
+  }
+  return originalFetch(url, options);
+};
+
 // --- HTML 이스케이프 유틸리티 (XSS 방어) ---
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -5804,9 +5815,15 @@ document.addEventListener("DOMContentLoaded", () => {
           if (response.ok) {
             localStorage.setItem("erp_jwt_token", data.token);
             localStorage.setItem("erp_user_info", JSON.stringify(data.user));
+            localStorage.setItem("erp_active_company_id", data.user.companyId); // 기본 활성 회사 지정
             
             updateLoginStatusUI(data.user);
             updateCloudSyncStatusUI();
+            
+            if (data.branches) {
+              renderBranchSelector(data.branches, data.user.companyId);
+            }
+            
             authOverlay.style.display = "none";
             
             await smartSync();
@@ -5828,6 +5845,110 @@ document.addEventListener("DOMContentLoaded", () => {
     if (userDisplay && user) {
       userDisplay.textContent = `${user.companyName} [${user.name} 님]`;
     }
+  }
+
+  function renderBranchSelector(branches, currentCompanyId) {
+    const selector = document.getElementById("company-branch-selector");
+    if (!selector) return;
+
+    if (!branches || branches.length <= 1) {
+      selector.style.display = "none";
+      return;
+    }
+
+    selector.innerHTML = "";
+    branches.forEach(b => {
+      const option = document.createElement("option");
+      option.value = b.id;
+      option.textContent = b.isParent ? `🏢 [본사] ${b.name}` : `📍 [지사] ${b.name}`;
+      if (Number(b.id) === Number(currentCompanyId)) {
+        option.selected = true;
+      }
+      option.style.background = "#1f1a3a";
+      option.style.color = "#fff";
+      selector.appendChild(option);
+    });
+
+    selector.style.display = "inline-block";
+
+    if (!selector.dataset.listenerBound) {
+      selector.dataset.listenerBound = "true";
+      selector.addEventListener("change", (e) => {
+        const selectedId = e.target.value;
+        localStorage.setItem("erp_active_company_id", selectedId);
+        location.reload();
+      });
+    }
+  }
+
+  // 지점(지사) 목록 조회 및 렌더링
+  async function renderBranches() {
+    const token = localStorage.getItem("erp_jwt_token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(API_BASE + "/api/erp/branches", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) return;
+
+      const branches = await response.json();
+      const tbody = document.getElementById("branch-list-rows");
+      if (!tbody) return;
+
+      if (branches.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">등록된 지사 정보가 없습니다.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = branches.map(b => `
+        <tr>
+          <td>${b.id}</td>
+          <td style="font-weight: 600; color: #a78bfa;">${escapeHtml(b.name)}</td>
+          <td>${new Date(b.created_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      console.error("renderBranches error:", err);
+    }
+  }
+
+  // 지사 신규 등록 처리
+  const formBranchAdd = document.getElementById("form-branch-add");
+  if (formBranchAdd) {
+    formBranchAdd.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const token = localStorage.getItem("erp_jwt_token");
+      if (!token) return;
+
+      const nameInput = document.getElementById("branch-add-name");
+      const name = nameInput ? nameInput.value.trim() : "";
+      if (!name) return;
+
+      try {
+        const response = await fetch(API_BASE + "/api/erp/branches", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ name })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          alert("신규 지사(지점)가 정상적으로 개설되었습니다. 상단 드롭다운에서 바로 전환하실 수 있습니다.");
+          if (nameInput) nameInput.value = "";
+          await renderBranches();
+          await checkAuth(); // 세션 정보를 갱신하여 드롭다운 새로고침
+        } else {
+          alert(data.error || "지사 개설에 실패했습니다.");
+        }
+      } catch (err) {
+        console.error("Create branch error:", err);
+        alert("지사 등록 도중 네트워크 오류가 발생했습니다.");
+      }
+    });
   }
 
   function updateCloudSyncStatusUI() {
@@ -5871,6 +5992,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (confirm("로그아웃 하시겠습니까? 로컬 변경 사항 중 서버에 반영되지 않은 내역이 유실될 수 있습니다.")) {
         localStorage.removeItem("erp_jwt_token");
         localStorage.removeItem("erp_user_info");
+        localStorage.removeItem("erp_active_company_id"); // 활성 회사 제거
         location.reload();
       }
     });
@@ -5892,6 +6014,28 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json();
         updateLoginStatusUI(data.user);
         updateCloudSyncStatusUI();
+        
+        if (data.branches) {
+          renderBranchSelector(data.branches, data.user.companyId);
+        }
+
+        // 지사 관리 서브탭 노출 통제
+        const branchTabBtn = document.getElementById("tab-btn-branch-settings");
+        if (branchTabBtn) {
+          if (!data.user.isBranch) {
+            branchTabBtn.style.display = "inline-block";
+            renderBranches(); // 지사 목록 렌더링
+          } else {
+            branchTabBtn.style.display = "none";
+            // 지사 계정인데 지사관리 서브탭이 켜져있다면 본사 설정 탭으로 안전 리다이렉트
+            const activeSubtab = document.querySelector(".inner-tab.active");
+            if (activeSubtab && activeSubtab.getAttribute("data-subtab") === "subtab-branch-settings") {
+              const hqTabBtn = document.querySelector(".inner-tab[data-subtab='subtab-hq-settings']");
+              if (hqTabBtn) hqTabBtn.click();
+            }
+          }
+        }
+        
         authOverlay.style.display = "none";
         await smartSync();
       } else {
