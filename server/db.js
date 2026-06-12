@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 let dbType = 'sqlite';
 let pgPool = null;
@@ -17,8 +18,8 @@ try {
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
 const connectionString = process.env.DATABASE_URL || "postgresql://smart_erp_db_2o7b_user:OZRggEHCo0AECVqpgzNwGA3Nzx992jTn@dpg-d8j4sjmq1p3s73fbgrjg-a/smart_erp_db_2o7b";
 
-// 디폴트로 SQLite 데이터베이스 준비
-const dbPath = path.resolve(__dirname, '../db.sqlite');
+// 디폴트로 SQLite 데이터베이스 준비 (쓰기 권한 보장되는 임시 폴더에 생성)
+const dbPath = path.resolve(os.tmpdir(), 'smart_erp_db.sqlite');
 if (sqlite3) {
   sqliteDb = new sqlite3.Database(dbPath);
   console.log("로컬 SQLite 백업 드라이버가 준비되었습니다: " + dbPath);
