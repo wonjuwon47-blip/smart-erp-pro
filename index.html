@@ -594,7 +594,10 @@
                 </div>
                 <div class="form-group">
                   <label>공급자 (매입처)</label>
-                  <select id="pur-partner" required></select>
+                  <div class="searchable-select-container" style="position: relative; width: 100%;">
+                    <input type="text" id="pur-partner" placeholder="검색 또는 직접 입력..." required autocomplete="off" style="width: 100%;">
+                    <div id="pur-partner-dropdown" class="searchable-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--panel-border); border-radius: 8px; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); margin-top: 4px;"></div>
+                  </div>
                 </div>
               </div>
 
@@ -733,7 +736,10 @@
               </div>
               <div class="form-group">
                 <label>매출처 (거래처)</label>
-                <select id="sales-partner" required></select>
+                <div class="searchable-select-container" style="position: relative; width: 100%;">
+                  <input type="text" id="sales-partner" placeholder="검색 또는 직접 입력..." required autocomplete="off" style="width: 100%;">
+                  <div id="sales-partner-dropdown" class="searchable-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--panel-border); border-radius: 8px; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); margin-top: 4px;"></div>
+                </div>
               </div>
               <div class="form-group">
                 <label>수금 구분</label>

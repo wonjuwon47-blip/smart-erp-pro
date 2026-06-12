@@ -1112,22 +1112,102 @@ window.deleteProduct = function(idx) {
 
 // --- 7. 셀렉트 박스 동적 데이터 탑재 및 검색 필터링 매핑 ---
 function renderSelectOptions() {
-  const purPartner = document.getElementById("pur-partner");
-  const salesPartner = document.getElementById("sales-partner");
   const purFilterPartner = document.getElementById("pur-filter-partner");
   const salesFilterPartner = document.getElementById("sales-filter-partner");
 
-  if(purPartner) {
-    purPartner.innerHTML = db.partners.filter(p => p.type === '매입처' || p.type === '혼합').map(p => `<option value="${p.name}">${p.name}</option>`).join("");
-  }
-  if(salesPartner) {
-    salesPartner.innerHTML = db.partners.filter(p => p.type === '매출처' || p.type === '혼합').map(p => `<option value="${p.name}">${p.name}</option>`).join("");
-  }
-  
   // 조회용 필터 셀렉트 연계
   const filterPartnersHtml = '<option value="">전체 거래처</option>' + db.partners.map(p => `<option value="${p.name}">${p.name}</option>`).join("");
   if(purFilterPartner) purFilterPartner.innerHTML = filterPartnersHtml;
   if(salesFilterPartner) salesFilterPartner.innerHTML = filterPartnersHtml;
+
+  // 검색형 거래처 자동완성 바인딩 및 갱신
+  initSearchablePartnerAutocomplete();
+}
+
+// 검색형 거래처 자동완성 초기화 및 이벤트 리스너 세팅
+function initSearchablePartnerAutocomplete() {
+  setupPartnerInput("pur-partner", "pur-partner-dropdown", () => db.partners.filter(p => p.type === '매입처' || p.type === '혼합'));
+  setupPartnerInput("sales-partner", "sales-partner-dropdown", () => db.partners.filter(p => p.type === '매출처' || p.type === '혼합'));
+}
+
+// 개별 검색 자동완성 인풋 제어 도우미 함수
+function setupPartnerInput(inputId, dropdownId, getPartnerListFn) {
+  const inputEl = document.getElementById(inputId);
+  const dropdownEl = document.getElementById(dropdownId);
+  if (!inputEl || !dropdownEl) return;
+
+  if (inputEl.dataset.autocompleteBound === "true") {
+    return;
+  }
+  inputEl.dataset.autocompleteBound = "true";
+
+  function renderDropdown(filterText = "") {
+    const query = filterText.toLowerCase().trim();
+    const partners = getPartnerListFn();
+    const filtered = partners.filter(p => 
+      p.name.toLowerCase().includes(query) || 
+      (p.bizNo && p.bizNo.replace(/-/g, '').includes(query)) ||
+      (p.owner && p.owner.toLowerCase().includes(query))
+    );
+
+    dropdownEl.innerHTML = "";
+
+    if (filtered.length === 0) {
+      dropdownEl.innerHTML = `<div style="padding: 10px 14px; color: var(--text-muted); font-size: 0.85rem; text-align: center;">검색 결과가 없습니다.</div>`;
+      return;
+    }
+
+    filtered.forEach(p => {
+      const itemEl = document.createElement("div");
+      itemEl.style.padding = "10px 14px";
+      itemEl.style.cursor = "pointer";
+      itemEl.style.fontSize = "0.85rem";
+      itemEl.style.transition = "background 0.2s ease";
+      itemEl.style.borderBottom = "1px solid rgba(255, 255, 255, 0.03)";
+      itemEl.className = "dropdown-item-partner";
+      
+      itemEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #fff;">${escapeHtml(p.name)}</strong>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(p.owner || '')} ${p.bizNo ? '/' + escapeHtml(p.bizNo) : ''}</span>
+        </div>
+      `;
+      
+      itemEl.addEventListener("mouseenter", () => {
+        itemEl.style.background = "rgba(167, 139, 250, 0.15)";
+      });
+      itemEl.addEventListener("mouseleave", () => {
+        itemEl.style.background = "transparent";
+      });
+
+      itemEl.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        inputEl.value = p.name;
+        dropdownEl.style.display = "none";
+        
+        inputEl.dispatchEvent(new Event("change"));
+        inputEl.dispatchEvent(new Event("input"));
+      });
+
+      dropdownEl.appendChild(itemEl);
+    });
+  }
+
+  inputEl.addEventListener("focus", () => {
+    dropdownEl.style.display = "block";
+    renderDropdown(inputEl.value);
+  });
+
+  inputEl.addEventListener("input", () => {
+    dropdownEl.style.display = "block";
+    renderDropdown(inputEl.value);
+  });
+
+  inputEl.addEventListener("blur", () => {
+    setTimeout(() => {
+      dropdownEl.style.display = "none";
+    }, 200);
+  });
 }
 
 // --- 8. 대화형 품목 검색 레이어 모달 비즈니스 로직 ---
