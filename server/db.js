@@ -16,7 +16,13 @@ try {
 }
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
-const connectionString = process.env.DATABASE_URL || "";
+let connectionString = process.env.DATABASE_URL || "postgresql://postgres:23Th4781%21%3F%21%3F@db.znxjpftpskucsgevgfah.supabase.co:5432/postgres";
+
+// 환경변수에 최신 비밀번호(23Th4781!?!?)가 누락되었거나 구 비밀번호가 설정된 경우를 방어하기 위해 강제 덮어쓰기 적용
+if (connectionString && !connectionString.includes('23Th4781%21%3F%21%3F') && !connectionString.includes('23Th4781!?!?')) {
+  console.warn("환경변수 DATABASE_URL의 비밀번호가 최신이 아니거나 잘못되어 하드코딩된 Supabase 새 연결 주소로 대체합니다.");
+  connectionString = "postgresql://postgres:23Th4781%21%3F%21%3F@db.znxjpftpskucsgevgfah.supabase.co:5432/postgres";
+}
 
 // 디폴트로 SQLite 데이터베이스 준비 (쓰기 권한 보장되는 임시 폴더에 생성)
 const dbPath = path.resolve(os.tmpdir(), 'smart_erp_db.sqlite');
