@@ -1210,39 +1210,84 @@
 
           <!-- Left: 라벨 스티커 디자인 설정 -->
           <div class="card" style="margin-top: 20px;">
-            <h2>라벨 스티커 디자인 설정 (60mm x 60mm 감열 규격)</h2>
-            <form id="form-label-settings" style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 16px;">
+              <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="settings" style="color: var(--primary-color);"></i> 라벨 스티커 디자인 및 프린터 설정</h2>
+              <span style="background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3); font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">
+                <span style="width: 6px; height: 6px; background-color: #60a5fa; border-radius: 50%; display: inline-block;"></span> HPRT SL43 최적화 지원
+              </span>
+            </div>
+            
+            <!-- HPRT SL43 프린터 연결 및 설정 가이드 (Glassmorphism & Pastel Accent) -->
+            <div style="background: rgba(96, 165, 250, 0.04); border: 1px solid rgba(96, 165, 250, 0.12); border-radius: 12px; padding: 18px; font-size: 0.85rem; line-height: 1.6; margin-bottom: 20px;">
+              <h3 style="color: #60a5fa; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700;">
+                <i data-lucide="printer" style="width: 18px; height: 18px; color: #60a5fa;"></i> HPRT SL43 라벨 프린터 웹 연동 가이드
+              </h3>
+              <ul style="padding-left: 20px; margin: 0; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px; list-style-type: decimal;">
+                <li><strong style="color: #fff;">드라이버 설치:</strong> PC에 HPRT SL43 감열 프린터 드라이버가 정상 설치되었는지 확인하십시오.</li>
+                <li><strong style="color: #fff;">프린터 용지 크기 기본값 설정:</strong> 제어판 &gt; 장치 및 프린터 &gt; 'SL43' 마우스 우클릭 &gt; <span style="color: var(--primary-color); font-weight: bold;">[인쇄 기본 설정]</span>에서 장착한 라벨지 크기(예: 60x60mm 또는 100x100mm 등)를 정확하게 생성 및 지정해야 밀림이 없습니다.</li>
+                <li><strong style="color: #fff;">브라우저 인쇄 설정 매칭:</strong> 인쇄 대화상자가 열리면 대상을 <span style="color: var(--primary-color); font-weight: bold;">[HPRT SL43]</span>으로 선택하고 설정에서 <strong>여백 '없음'</strong>, <strong>배경 그래픽 '체크'</strong>로 인쇄해 주십시오.</li>
+              </ul>
+            </div>
+
+            <form id="form-label-settings" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>라벨 용지 규격 선택</label>
+                  <select id="setting-lbl-size-preset" onchange="handleLabelPresetChange(this.value)">
+                    <option value="60x60">60mm x 60mm (기본 정사각형)</option>
+                    <option value="80x80">80mm x 80mm (대형 정사각형)</option>
+                    <option value="100x100">100mm x 100mm (HPRT SL43 대형 규격)</option>
+                    <option value="100x60">100mm x 60mm (HPRT SL43 직사각형)</option>
+                    <option value="40x30">40mm x 30mm (HPRT SL43 소형 규격)</option>
+                    <option value="custom">직접 지정 (Custom)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="display: flex; flex-direction: row; gap: 12px; align-items: flex-end;">
+                  <div style="flex: 1;">
+                    <label>가로 크기 (Width, mm)</label>
+                    <input type="number" id="setting-lbl-width" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                  </div>
+                  <div style="flex: 1;">
+                    <label>세로 크기 (Height, mm)</label>
+                    <input type="number" id="setting-lbl-height" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                  </div>
+                </div>
+              </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>공급처 (본사명) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-title" value="22" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-title" value="22" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>품종 (품목명) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-product" value="22" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-product" value="22" min="6" max="48" step="0.5">
                 </div>
               </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>산지 (원산지) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-origin" value="18" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-origin" value="18" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>무게 (수량) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-weight" value="28" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-weight" value="28" min="6" max="48" step="0.5">
                 </div>
               </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>공급자 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-supplier" value="10.5" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-supplier" value="10.5" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>포장일 (입고일) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-date" value="23" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-date" value="23" min="6" max="48" step="0.5">
                 </div>
               </div>
-              <button type="submit" class="btn btn-primary" style="margin-top: 16px;"><i data-lucide="save"></i> 라벨 디자인 설정 저장</button>
+              
+              <div style="display: flex; gap: 12px; margin-top: 8px;">
+                <button type="submit" class="btn btn-primary" style="flex: 2; height: 44px;"><i data-lucide="save"></i> 설정 저장</button>
+                <button type="button" class="btn btn-success" onclick="printLabelTest()" style="flex: 1; height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;"><i data-lucide="printer"></i> 테스트 인쇄</button>
+              </div>
             </form>
           </div>
 

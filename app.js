@@ -176,7 +176,10 @@ const defaultDb = {
       weight: 28,
       supplier: 10.5,
       date: 23
-    }
+    },
+    labelPreset: "60x60",
+    labelWidth: 60,
+    labelHeight: 60
   },
   // 거래처별 수금/지급액 누계 (외상 관리용)
   receivablesPayments: {},
@@ -202,6 +205,9 @@ if (!db.settings.labelFonts) {
     date: 23
   };
 }
+if (db.settings.labelPreset === undefined) db.settings.labelPreset = "60x60";
+if (db.settings.labelWidth === undefined) db.settings.labelWidth = 60;
+if (db.settings.labelHeight === undefined) db.settings.labelHeight = 60;
 
 // --- 매출/매입 데이터를 동기화용 인보이스 스펙으로 양방향 변환 ---
 function prepareInvoicesForSync() {
@@ -1847,6 +1853,9 @@ function getLabelHtml(sale) {
   let supplierCore = activeHq.name.replace(/\(주\)/g, "").split(" ")[0].trim();
   if (supplierCore.length > 5) supplierCore = supplierCore.substring(0, 5);
 
+  const width = db.settings.labelWidth || 60;
+  const height = db.settings.labelHeight || 60;
+
   let labelHtml = "";
   sale.items.forEach((item, idx) => {
     const isLast = idx === sale.items.length - 1;
@@ -1874,7 +1883,7 @@ function getLabelHtml(sale) {
     }
 
     labelHtml += `
-      <div class="print-label-box" style="width: 60mm; height: 60mm; page-break-after: ${isLast ? 'avoid' : 'always'}; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
+      <div class="print-label-box" style="width: ${width}mm; height: ${height}mm; page-break-after: ${isLast ? 'avoid' : 'always'}; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
         <!-- Row 1: 공급처 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
@@ -1908,10 +1917,12 @@ function getLabelHtml(sale) {
 }
 
 function triggerLabelPrintDoc(sale) {
+  const width = db.settings.labelWidth || 60;
+  const height = db.settings.labelHeight || 60;
   injectPrintStyle(`
     @media print {
       @page {
-        size: 60mm 60mm;
+        size: ${width}mm ${height}mm;
         margin: 0;
       }
     }
@@ -3940,6 +3951,23 @@ if (formLabel) {
   document.getElementById("setting-lbl-font-supplier").value = db.settings.labelFonts.supplier;
   document.getElementById("setting-lbl-font-date").value = db.settings.labelFonts.date;
 
+  const presetEl = document.getElementById("setting-lbl-size-preset");
+  const widthEl = document.getElementById("setting-lbl-width");
+  const heightEl = document.getElementById("setting-lbl-height");
+  if (presetEl && widthEl && heightEl) {
+    presetEl.value = db.settings.labelPreset || "60x60";
+    widthEl.value = db.settings.labelWidth || 60;
+    heightEl.value = db.settings.labelHeight || 60;
+    
+    if (presetEl.value !== "custom") {
+      widthEl.disabled = true;
+      heightEl.disabled = true;
+    } else {
+      widthEl.disabled = false;
+      heightEl.disabled = false;
+    }
+  }
+
   formLabel.onsubmit = (e) => {
     e.preventDefault();
     db.settings.labelFonts = {
@@ -3950,10 +3978,73 @@ if (formLabel) {
       supplier: parseFloat(document.getElementById("setting-lbl-font-supplier").value) || 10.5,
       date: parseFloat(document.getElementById("setting-lbl-font-date").value) || 23
     };
+    db.settings.labelPreset = document.getElementById("setting-lbl-size-preset").value;
+    db.settings.labelWidth = parseFloat(document.getElementById("setting-lbl-width").value) || 60;
+    db.settings.labelHeight = parseFloat(document.getElementById("setting-lbl-height").value) || 60;
+
     saveDb();
-    alert("라벨 스티커 디자인 글꼴 설정이 저장되었습니다.");
+    alert("라벨 스티커 디자인 및 프린터 설정이 저장되었습니다.");
   };
 }
+
+// 라벨 프리셋 변경 핸들러
+window.handleLabelPresetChange = function(presetValue) {
+  const widthEl = document.getElementById("setting-lbl-width");
+  const heightEl = document.getElementById("setting-lbl-height");
+  if (!widthEl || !heightEl) return;
+  
+  if (presetValue === "custom") {
+    widthEl.disabled = false;
+    heightEl.disabled = false;
+    return;
+  }
+  
+  widthEl.disabled = true;
+  heightEl.disabled = true;
+  
+  const specs = {
+    "60x60": { w: 60, h: 60, title: 22, product: 22, origin: 18, weight: 28, supplier: 10.5, date: 23 },
+    "80x80": { w: 80, h: 80, title: 28, product: 28, origin: 22, weight: 36, supplier: 14, date: 28 },
+    "100x100": { w: 100, h: 100, title: 36, product: 36, origin: 28, weight: 46, supplier: 18, date: 36 },
+    "100x60": { w: 100, h: 60, title: 26, product: 24, origin: 18, weight: 32, supplier: 12, date: 24 },
+    "40x30": { w: 40, h: 30, title: 14, product: 12, origin: 10, weight: 18, supplier: 8, date: 12 }
+  };
+  
+  const spec = specs[presetValue];
+  if (spec) {
+    widthEl.value = spec.w;
+    heightEl.value = spec.h;
+    
+    document.getElementById("setting-lbl-font-title").value = spec.title;
+    document.getElementById("setting-lbl-font-product").value = spec.product;
+    document.getElementById("setting-lbl-font-origin").value = spec.origin;
+    document.getElementById("setting-lbl-font-weight").value = spec.weight;
+    document.getElementById("setting-lbl-font-supplier").value = spec.supplier;
+    document.getElementById("setting-lbl-font-date").value = spec.date;
+  }
+};
+
+// 라벨 테스트 인쇄 핸들러
+window.printLabelTest = function() {
+  const testSale = {
+    id: "TEST-" + Date.now().toString().slice(-4),
+    partner: "원주초등학교 (테스트)",
+    date: new Date().toISOString().split("T")[0],
+    items: [
+      {
+        name: "친환경 방울토마토 (5kg/BOX)",
+        origin: "국내산 (강원도)",
+        qty: 1,
+        unit: "BOX",
+        price: 25000,
+        amount: 25000,
+        tax: 0,
+        total: 25000
+      }
+    ]
+  };
+  triggerLabelPrintDoc(testSale);
+};
 
 // 키보드 단축키 감지 (F2, F4, F7, F8, F9 커스텀 단축키 포함)
 window.addEventListener("keydown", (e) => {
