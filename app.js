@@ -14,6 +14,9 @@ const OCR_MOCK_DELAY_MS = 1500;
 const AUTO_MARKUP_MARGIN = 1.3;
 const INLINE_INPUT_STYLE = "background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:2px 4px; border-radius:4px;";
 
+// --- 실서버 통신용 절대 경로 Base URL 설정 (로컬 파일 index.html 기동 대응) ---
+const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'https://smart-erp-pro-24pu.onrender.com' : '';
+
 // --- HTML 이스케이프 유틸리티 (XSS 방어) ---
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -368,7 +371,7 @@ async function syncToCloud() {
   
   isSyncing = true;
   try {
-    const response = await fetch("/api/erp/backup/import", {
+    const response = await fetch(API_BASE + "/api/erp/backup/import", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -407,7 +410,7 @@ async function syncFromCloud() {
   
   isSyncing = true;
   try {
-    const response = await fetch("/api/erp/backup/export", {
+    const response = await fetch(API_BASE + "/api/erp/backup/export", {
       headers: {
         "Authorization": `Bearer ${token}`
       }
@@ -480,7 +483,7 @@ async function smartSync() {
   
   isSyncing = true;
   try {
-    const response = await fetch("/api/erp/backup/export", {
+    const response = await fetch(API_BASE + "/api/erp/backup/export", {
       headers: { "Authorization": `Bearer ${token}` }
     });
     if (!response.ok) {
@@ -5768,7 +5771,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = authUserFullname.value.trim();
 
         try {
-          const response = await fetch("/api/auth/register", {
+          const response = await fetch(API_BASE + "/api/auth/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password, companyName, name })
@@ -5787,7 +5790,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else {
         try {
-          const response = await fetch("/api/auth/login", {
+          const response = await fetch(API_BASE + "/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password })
@@ -5877,7 +5880,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     try {
-      const response = await fetch("/api/auth/me", {
+      const response = await fetch(API_BASE + "/api/auth/me", {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
