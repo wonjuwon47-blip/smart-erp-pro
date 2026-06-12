@@ -454,6 +454,29 @@ router.delete('/invoices/:id', async (req, res) => {
   }
 });
 
+// 일일 품목확인서용 매출 평탄화 집계 조회 API
+router.get('/invoices/daily-summary', async (req, res) => {
+  const { date } = req.query;
+  if (!date) {
+    return res.status(400).json({ error: "조회할 날짜(date) 파라미터가 누락되었습니다." });
+  }
+
+  try {
+    const summary = await db.query(`
+      SELECT i.partner_name, ii.name AS item_name, ii.qty, ii.unit
+      FROM invoices i
+      JOIN invoice_items ii ON i.id = ii.invoice_id
+      WHERE i.company_id = ? AND i.type = 'sales' AND i.date = ?
+      ORDER BY i.partner_name ASC, ii.name ASC
+    `, [req.user.company_id, date]);
+
+    res.json(summary);
+  } catch (err) {
+    console.error("Daily summary aggregation error:", err);
+    res.status(500).json({ error: "일일 품목 확인서 데이터를 집계하지 못했습니다." });
+  }
+});
+
 // ==========================================
 // 4. 본사(Headquarters) API
 // ==========================================

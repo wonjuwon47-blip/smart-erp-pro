@@ -554,6 +554,7 @@ const tabMeta = {
   receivables: { title: "외상대금/미수금 관리", desc: "거래처별 누적 잔액 파악 및 미수금 수납/지급 원장을 작성합니다." },
   estimates: { title: "견적서 관리", desc: "견적서 작성, 출력 및 이력 관리 기능을 수행합니다." },
   "order-sheet": { title: "통합 발주표 관리", desc: "통합 발주 엑셀 파일을 업로드하고, 일자별 피벗 현황 조회 및 매출 전표 일괄 자동 등록을 처리합니다." },
+  "daily-verification": { title: "일일 품목확인서", desc: "지정한 배송 일자에 각 학교(거래처)로 납품될 물품들의 총 수량을 격자판 피벗 형태로 집계하고 인쇄용 서류를 출력합니다." },
   settings: { title: "설정 및 데이터 관리", desc: "시스템 환경설정, 출력지 여백 마진 조정, 데이터 백업/복구를 관리합니다." }
 };
 
@@ -582,6 +583,12 @@ menuItems.forEach(item => {
     }
     if (tabId === 'order-sheet') {
       renderOrderSheetData();
+    }
+    if (tabId === 'daily-verification') {
+      const dateInput = document.getElementById("daily-verif-date");
+      if (dateInput && !dateInput.value) {
+        dateInput.value = getKstTodayString();
+      }
     }
   });
 });
@@ -6342,5 +6349,214 @@ document.addEventListener("DOMContentLoaded", () => {
     
     reader.readAsArrayBuffer(file);
   };
+
+  // --- 일일 품목확인서 기능 구현 ---
+  const btnDailyVerifSearch = document.getElementById("btn-daily-verif-search");
+  const btnDailyVerifPrint = document.getElementById("btn-daily-verif-print");
+  const dailyVerifDateInput = document.getElementById("daily-verif-date");
+  const dailyVerifPrintArea = document.getElementById("daily-verif-print-area");
+
+  if (btnDailyVerifSearch) {
+    btnDailyVerifSearch.addEventListener("click", () => {
+      const selectedDate = dailyVerifDateInput.value;
+      if (!selectedDate) {
+        alert("배송 일자를 선택해 주세요.");
+        return;
+      }
+      fetchDailyVerificationData(selectedDate);
+    });
+  }
+
+  if (btnDailyVerifPrint) {
+    btnDailyVerifPrint.addEventListener("click", () => {
+      window.print();
+    });
+  }
+
+  async function fetchDailyVerificationData(date) {
+    dailyVerifPrintArea.innerHTML = `
+      <div class="card" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <i data-lucide="loader-2" class="spin-icon" style="margin-right: 8px;"></i> 데이터를 불러오는 중입니다...
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+
+    const token = localStorage.getItem("erp_jwt_token");
+    let summaryData = [];
+
+    if (token) {
+      try {
+        const response = await fetch(`${API_BASE}/api/erp/invoices/daily-summary?date=${date}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          summaryData = await response.json();
+        } else {
+          console.warn("백엔드 일일 집계 API 요청 실패. 로컬 DB에서 데이터 조회를 시도합니다.");
+          summaryData = getDailySummaryFromLocalDb(date);
+        }
+      } catch (err) {
+        console.error("백엔드 통신 에러, 로컬 DB 데이터를 사용합니다.", err);
+        summaryData = getDailySummaryFromLocalDb(date);
+      }
+    } else {
+      summaryData = getDailySummaryFromLocalDb(date);
+    }
+
+    renderDailyVerification(summaryData, date);
+  }
+
+  function getDailySummaryFromLocalDb(date) {
+    const summary = [];
+    if (!db.sales || !Array.isArray(db.sales)) return summary;
+
+    db.sales.forEach(sale => {
+      if (sale.date === date) {
+        const partnerName = sale.partner || "미지정 거래처";
+        if (sale.items && Array.isArray(sale.items)) {
+          sale.items.forEach(item => {
+            summary.push({
+              partner_name: partnerName,
+              item_name: item.name,
+              qty: item.qty || 0,
+              unit: item.unit || ""
+            });
+          });
+        }
+      }
+    });
+    return summary;
+  }
+
+  function renderDailyVerification(data, date) {
+    if (!data || data.length === 0) {
+      dailyVerifPrintArea.innerHTML = `
+        <div id="daily-verif-empty-state" class="card" style="text-align: center; padding: 40px; color: var(--text-muted);">
+          선택하신 배송 일자(${date})에 해당하는 매출(학교 납품) 내역이 없습니다.
+        </div>
+      `;
+      if (btnDailyVerifPrint) btnDailyVerifPrint.style.display = "none";
+      return;
+    }
+
+    const schools = [...new Set(data.map(d => d.partner_name))].sort();
+    const products = [...new Set(data.map(d => d.item_name))].sort();
+
+    const pivotMap = {};
+    products.forEach(p => {
+      pivotMap[p] = {};
+      schools.forEach(s => {
+        pivotMap[p][s] = 0;
+      });
+    });
+
+    data.forEach(d => {
+      if (pivotMap[d.item_name] && pivotMap[d.item_name][d.partner_name] !== undefined) {
+        pivotMap[d.item_name][d.partner_name] += Number(d.qty) || 0;
+      }
+    });
+
+    const productTotals = {};
+    products.forEach(p => {
+      let sum = 0;
+      schools.forEach(s => {
+        sum += pivotMap[p][s];
+      });
+      productTotals[p] = sum;
+    });
+
+    const ROWS_PER_PAGE = 35;
+    const COLS_PER_PAGE = 12;
+
+    const schoolGroups = [];
+    for (let i = 0; i < schools.length; i += COLS_PER_PAGE) {
+      schoolGroups.push(schools.slice(i, i + COLS_PER_PAGE));
+    }
+
+    const productGroups = [];
+    for (let i = 0; i < products.length; i += ROWS_PER_PAGE) {
+      productGroups.push(products.slice(i, i + ROWS_PER_PAGE));
+    }
+
+    const totalPages = schoolGroups.length * productGroups.length;
+    let pageCount = 0;
+
+    dailyVerifPrintArea.innerHTML = "";
+
+    schoolGroups.forEach((schoolGroup, colGroupIdx) => {
+      productGroups.forEach((productGroup, rowGroupIdx) => {
+        pageCount++;
+        
+        const schoolRange = `학교 ${colGroupIdx * COLS_PER_PAGE + 1}~${colGroupIdx * COLS_PER_PAGE + schoolGroup.length}`;
+        const productRange = `품목 ${rowGroupIdx * ROWS_PER_PAGE + 1}~${rowGroupIdx * ROWS_PER_PAGE + productGroup.length}`;
+
+        const pageDiv = document.createElement("div");
+        pageDiv.className = "daily-verif-page";
+        
+        let html = `
+          <div class="daily-verif-title">일일 품목확인서</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.85rem; color: #fff;" class="daily-verif-meta">
+            <div>배송일자: <strong>${date}</strong></div>
+            <div>페이지: <strong>${pageCount} / ${totalPages}</strong> (${schoolRange}, ${productRange})</div>
+          </div>
+          <table class="daily-verif-table">
+            <thead>
+              <tr>
+                <th style="width: 200px;">물품명</th>
+        `;
+
+        schoolGroup.forEach(school => {
+          html += `<th>${escapeHtml(school)}</th>`;
+        });
+        
+        html += `
+                <th style="width: 80px;">합계</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        productGroup.forEach(product => {
+          html += `
+            <tr>
+              <td class="row-header">${escapeHtml(product)}</td>
+          `;
+
+          schoolGroup.forEach(school => {
+            const qty = pivotMap[product][school];
+            html += `<td>${qty > 0 ? qty : ""}</td>`;
+          });
+
+          html += `<td class="col-total">${productTotals[product]}</td></tr>`;
+        });
+
+        html += `
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>물품명</th>
+        `;
+
+        schoolGroup.forEach(school => {
+          html += `<th>${escapeHtml(school)}</th>`;
+        });
+
+        html += `
+                <th>합계</th>
+              </tr>
+            </tfoot>
+          </table>
+        `;
+
+        pageDiv.innerHTML = html;
+        dailyVerifPrintArea.appendChild(pageDiv);
+      });
+    });
+
+    if (btnDailyVerifPrint) btnDailyVerifPrint.style.display = "inline-block";
+    if (window.lucide) lucide.createIcons();
+  }
 
 });
