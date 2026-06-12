@@ -26,7 +26,7 @@ router.get('/partners', async (req, res) => {
 
 // 거래처 신규 등록
 router.post('/partners', async (req, res) => {
-  const { code, name, owner, bizNo, address, phone, type } = req.body;
+  const { code, name, abbreviation, owner, bizNo, address, phone, type } = req.body;
 
   if (!code || !name || !type) {
     return res.status(400).json({ error: "거래처 코드, 상호명, 거래처 구분은 필수 입력 값입니다." });
@@ -43,8 +43,8 @@ router.post('/partners', async (req, res) => {
     }
 
     const partnerId = await db.executeInsert(
-      "INSERT INTO partners (company_id, code, name, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.user.root_company_id, code, name, owner || '', bizNo || '', address || '', phone || '', type]
+      "INSERT INTO partners (company_id, code, name, abbreviation, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [req.user.root_company_id, code, name, abbreviation || null, owner || '', bizNo || '', address || '', phone || '', type]
     );
 
     res.status(201).json({ success: true, id: partnerId, message: "거래처가 성공적으로 등록되었습니다." });
@@ -56,7 +56,7 @@ router.post('/partners', async (req, res) => {
 
 // 거래처 수정
 router.put('/partners/:id', async (req, res) => {
-  const { code, name, owner, bizNo, address, phone, type } = req.body;
+  const { code, name, abbreviation, owner, bizNo, address, phone, type } = req.body;
   const partnerId = req.params.id;
 
   try {
@@ -70,8 +70,8 @@ router.put('/partners/:id', async (req, res) => {
     }
 
     await db.execute(
-      "UPDATE partners SET code = ?, name = ?, owner = ?, biz_no = ?, address = ?, phone = ?, type = ? WHERE id = ?",
-      [code, name, owner || '', bizNo || '', address || '', phone || '', type, partnerId]
+      "UPDATE partners SET code = ?, name = ?, abbreviation = ?, owner = ?, biz_no = ?, address = ?, phone = ?, type = ? WHERE id = ?",
+      [code, name, abbreviation || null, owner || '', bizNo || '', address || '', phone || '', type, partnerId]
     );
 
     res.json({ success: true, message: "거래처 정보가 수정되었습니다." });
@@ -1046,8 +1046,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.partners)) {
       for (const p of backup.partners) {
         await db.execute(
-          "INSERT INTO partners (id, company_id, code, name, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [p.id, companyId, p.code, p.name, p.owner || '', p.biz_no || '', p.address || '', p.phone || '', p.type]
+          "INSERT INTO partners (id, company_id, code, name, abbreviation, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [p.id, companyId, p.code, p.name, p.abbreviation || null, p.owner || '', p.biz_no || '', p.address || '', p.phone || '', p.type]
         );
       }
     }

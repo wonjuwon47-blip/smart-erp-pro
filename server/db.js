@@ -183,13 +183,14 @@ async function initDb() {
       )
     `);
 
-    // 3. 거래처 테이블
+    // 3. 거래처(매입/매출/혼합) 테이블
     await execute(`
       CREATE TABLE IF NOT EXISTS partners (
         id ${pkType},
         company_id INTEGER NOT NULL,
         code VARCHAR(50) NOT NULL,
         name VARCHAR(100) NOT NULL,
+        abbreviation VARCHAR(50) DEFAULT NULL,
         owner VARCHAR(50),
         biz_no VARCHAR(50),
         address ${textType},
@@ -394,6 +395,11 @@ async function initDb() {
     }
     try {
       await execute("ALTER TABLE products ADD COLUMN abbreviation VARCHAR(50)");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
+    try {
+      await execute("ALTER TABLE partners ADD COLUMN abbreviation VARCHAR(50)");
     } catch (e) {
       // 이미 컬럼이 존재하면 정상 패스
     }

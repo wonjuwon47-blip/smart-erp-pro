@@ -457,15 +457,19 @@
                 <input type="text" id="partner-name" placeholder="예: 한울농산" required>
               </div>
               <div class="form-group">
+                <label>거래처 약어 (일일확인서용)</label>
+                <input type="text" id="partner-abbreviation" placeholder="예: 강남초">
+              </div>
+              <div class="form-group">
                 <label>대표자 성명</label>
                 <input type="text" id="partner-owner" placeholder="최대표" required>
               </div>
+            </div>
+            <div class="form-grid">
               <div class="form-group">
                 <label>사업자 등록 번호</label>
                 <input type="text" id="partner-biz-no" placeholder="123-45-67890" required>
               </div>
-            </div>
-            <div class="form-grid">
               <div class="form-group">
                 <label>전화번호</label>
                 <input type="text" id="partner-phone" placeholder="02-1234-5678">
@@ -474,6 +478,8 @@
                 <label>사업장 주소</label>
                 <input type="text" id="partner-address" placeholder="경기도 여주시 ...">
               </div>
+            </div>
+            <div class="form-grid" style="margin-top: 12px;">
               <div class="form-group">
                 <label>거래 유형</label>
                 <select id="partner-type">
@@ -482,6 +488,9 @@
                   <option value="매출처">매출처 전용</option>
                 </select>
               </div>
+              <div class="form-group"></div>
+              <div class="form-group"></div>
+              <div class="form-group"></div>
             </div>
             <div style="display: flex; gap: 8px; margin-top: 16px;">
               <button type="submit" class="btn btn-primary" id="btn-partner-submit"><i data-lucide="plus"></i> 거래처 정보 등록</button>
@@ -522,6 +531,7 @@
                 <tr>
                   <th>코드</th>
                   <th>상호명</th>
+                  <th>약어</th>
                   <th>구분</th>
                   <th>대표자</th>
                   <th>사업자번호</th>

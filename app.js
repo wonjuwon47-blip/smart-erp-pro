@@ -975,6 +975,7 @@ function renderPartners() {
     row.innerHTML = `
       <td><code>${escapeHtml(p.code)}</code></td>
       <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.abbreviation || "")}</td>
       <td><span class="hotkey-badge">${escapeHtml(p.type)}</span></td>
       <td>${escapeHtml(p.owner)}</td>
       <td>${escapeHtml(p.bizNo)}</td>
@@ -1007,6 +1008,7 @@ if(formPartner) {
     const updatedPartner = {
       code: document.getElementById("partner-code").value,
       name: document.getElementById("partner-name").value,
+      abbreviation: document.getElementById("partner-abbreviation").value,
       owner: document.getElementById("partner-owner").value,
       bizNo: document.getElementById("partner-biz-no").value,
       address: document.getElementById("partner-address").value,
@@ -1040,6 +1042,7 @@ window.editPartner = function(idx) {
   editingPartnerIndex = idx;
   document.getElementById("partner-code").value = p.code || "";
   document.getElementById("partner-name").value = p.name || "";
+  document.getElementById("partner-abbreviation").value = p.abbreviation || "";
   document.getElementById("partner-owner").value = p.owner || "";
   document.getElementById("partner-biz-no").value = p.bizNo || "";
   document.getElementById("partner-address").value = p.address || "";
@@ -6608,7 +6611,14 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         schoolGroup.forEach(school => {
-          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
+          let displayName = school;
+          if (school !== "") {
+            const partner = db.partners.find(p => p.name === school);
+            if (partner && partner.abbreviation) {
+              displayName = partner.abbreviation;
+            }
+          }
+          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(displayName)}</th>`;
         });
         
         html += `
@@ -6657,7 +6667,14 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
 
         schoolGroup.forEach(school => {
-          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(school)}</th>`;
+          let displayName = school;
+          if (school !== "") {
+            const partner = db.partners.find(p => p.name === school);
+            if (partner && partner.abbreviation) {
+              displayName = partner.abbreviation;
+            }
+          }
+          html += `<th contenteditable="true" style="font-size: 0.8rem; vertical-align: middle;">${escapeHtml(displayName)}</th>`;
         });
 
         html += `
