@@ -16,7 +16,7 @@ try {
 }
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:23Th4781%21%40%23%24@db.znxjpftpskucsgevgfah.supabase.co:5432/postgres";
+const connectionString = process.env.DATABASE_URL || "";
 
 // 디폴트로 SQLite 데이터베이스 준비 (쓰기 권한 보장되는 임시 폴더에 생성)
 const dbPath = path.resolve(os.tmpdir(), 'smart_erp_db.sqlite');
