@@ -5821,4 +5821,226 @@ document.addEventListener("DOMContentLoaded", () => {
   
   processUploadedSchoolFiles();
 
+  // 이지폼 거래처 엑셀 일괄 이관 처리기
+  window.handleEasyFormPartnerExcel = function(input) {
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (rows.length < 2) {
+          alert("가져올 거래처 데이터가 엑셀 파일 내에 존재하지 않습니다.");
+          input.value = "";
+          return;
+        }
+        
+        const headerRow = rows[0].map(cell => String(cell || '').trim().replace(/\s+/g, ''));
+        
+        function findColIndex(names) {
+          return headerRow.findIndex(col => names.some(name => col.includes(name)));
+        }
+        
+        const idxBizNo = findColIndex(['등록번호', '사업자번호', '사업자등록번호', '등록']);
+        const idxName = findColIndex(['상호', '회사명', '업체명', '거래처명', '법인명']);
+        const idxOwner = findColIndex(['대표자', '대표', '성명', '대표자명', '대표자성명']);
+        const idxAddress = findColIndex(['사업장주소', '주소', '소재지', '배송주소']);
+        const idxPhone = findColIndex(['전화번호', '전화', '연락처', '핸드폰', '담당자전화', '담당자HP']);
+        const idxType = findColIndex(['회사구분', '구분', '유형', '거래처구분']);
+        
+        if (idxName === -1) {
+          alert("엑셀 파일 내에서 '상호' 또는 '회사명' 열을 찾을 수 없습니다. 헤더명을 확인해 주세요.");
+          input.value = "";
+          return;
+        }
+        
+        let importCount = 0;
+        let updateCount = 0;
+        
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+          
+          let pName = String(row[idxName] || '').trim();
+          if (!pName) continue;
+          
+          let pBizNo = idxBizNo !== -1 ? String(row[idxBizNo] || '').trim() : '';
+          let pOwner = idxOwner !== -1 ? String(row[idxOwner] || '').trim() : '';
+          let pAddress = idxAddress !== -1 ? String(row[idxAddress] || '').trim() : '';
+          let pPhone = idxPhone !== -1 ? String(row[idxPhone] || '').trim() : '';
+          let pRawType = idxType !== -1 ? String(row[idxType] || '').trim() : '';
+          
+          pBizNo = pBizNo.replace(/[^0-9]/g, '');
+          if (pBizNo.length === 10) {
+            pBizNo = pBizNo.substring(0, 3) + '-' + pBizNo.substring(3, 5) + '-' + pBizNo.substring(5);
+          }
+          
+          let pType = '혼합';
+          if (pRawType.includes('매입')) {
+            pType = '매입처';
+          } else if (pRawType.includes('매출')) {
+            pType = '매출처';
+          }
+          
+          let existingIndex = db.partners.findIndex(p => 
+            (p.name && p.name.trim() === pName) || 
+            (pBizNo && p.bizNo && p.bizNo.replace(/-/g, '') === pBizNo.replace(/-/g, ''))
+          );
+          
+          if (existingIndex !== -1) {
+            const existing = db.partners[existingIndex];
+            existing.bizNo = pBizNo || existing.bizNo;
+            existing.owner = pOwner || existing.owner;
+            existing.address = pAddress || existing.address;
+            existing.phone = pPhone || existing.phone;
+            existing.type = pType || existing.type;
+            updateCount++;
+          } else {
+            const newCode = "PTN-" + String(db.partners.length + 1).padStart(3, '0');
+            db.partners.push({
+              code: newCode,
+              name: pName,
+              bizNo: pBizNo,
+              owner: pOwner,
+              address: pAddress,
+              phone: pPhone,
+              type: pType
+            });
+            importCount++;
+          }
+        }
+        
+        saveDb();
+        renderPartners();
+        renderSelectOptions();
+        
+        alert(`이지폼 거래처 이관 완료!\n- 신규 등록: ${importCount}건\n- 기존 정보 업데이트: ${updateCount}건`);
+        
+      } catch (err) {
+        console.error(err);
+        alert("엑셀 파일을 파싱하는 도중 에러가 발생했습니다. 파일 형식을 확인해 주세요.");
+      } finally {
+        input.value = "";
+      }
+    };
+    
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 이지폼 물품 엑셀 일괄 이관 처리기
+  window.handleEasyFormProductExcel = function(input) {
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (rows.length < 2) {
+          alert("가져올 물품 데이터가 엑셀 파일 내에 존재하지 않습니다.");
+          input.value = "";
+          return;
+        }
+        
+        const headerRow = rows[0].map(cell => String(cell || '').trim().replace(/\s+/g, ''));
+        
+        function findColIndex(names) {
+          return headerRow.findIndex(col => names.some(name => col.includes(name)));
+        }
+        
+        const idxCode = findColIndex(['물품코드', '코드', '품목코드', '상품코드']);
+        const idxName = findColIndex(['물품명', '물품명칭', '품목명', '상품명', '이름', '품명']);
+        const idxUnit = findColIndex(['규격', '단위', '규격(단위)', '용량']);
+        const idxOrigin = findColIndex(['원산지', '산지', '원산지명']);
+        const idxPurchasePrice = findColIndex(['구매단가', '매입단가', '매입가', '구매가']);
+        const idxSalesPrice = findColIndex(['판매단가', '매출단가', '매출가', '판매가', '단가']);
+        const idxTaxType = findColIndex(['면세여부', '면세', '과세구분', '과세여부', '면세상품']);
+        const idxStock = findColIndex(['현재재고', '재고', '수량', '재고수량', '적정재고']);
+        
+        if (idxName === -1) {
+          alert("엑셀 파일 내에서 '물품명' 또는 '품목명' 열을 찾을 수 없습니다. 헤더명을 확인해 주세요.");
+          input.value = "";
+          return;
+        }
+        
+        let importCount = 0;
+        let updateCount = 0;
+        
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+          
+          let pName = String(row[idxName] || '').trim();
+          if (!pName) continue;
+          
+          let pCode = idxCode !== -1 ? String(row[idxCode] || '').trim() : '';
+          let pUnit = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'EA';
+          let pOrigin = idxOrigin !== -1 ? String(row[idxOrigin] || '').trim() : '국내산';
+          let pPurchasePrice = idxPurchasePrice !== -1 ? parseInt(String(row[idxPurchasePrice] || '').replace(/[^0-9]/g, '')) || 0 : 0;
+          let pSalesPrice = idxSalesPrice !== -1 ? parseInt(String(row[idxSalesPrice] || '').replace(/[^0-9]/g, '')) || 0 : 0;
+          let pRawTax = idxTaxType !== -1 ? String(row[idxTaxType] || '').trim() : '';
+          let pStock = idxStock !== -1 ? parseInt(String(row[idxStock] || '').replace(/[^0-9]/g, '')) || 0 : 0;
+          
+          let pTaxType = '과세';
+          if (pRawTax.includes('면세') || pRawTax === '1' || pRawTax.toLowerCase() === 'true' || pRawTax === 'Y' || pRawTax === 'y') {
+            pTaxType = '면세';
+          }
+          
+          let existingIndex = db.products.findIndex(p => p.name && p.name.trim() === pName);
+          
+          if (existingIndex !== -1) {
+            const existing = db.products[existingIndex];
+            existing.code = pCode || existing.code;
+            existing.unit = pUnit || existing.unit;
+            existing.origin = pOrigin || existing.origin;
+            existing.purchasePrice = pPurchasePrice || existing.purchasePrice;
+            existing.salesPrice = pSalesPrice || existing.salesPrice;
+            existing.taxType = pTaxType || existing.taxType;
+            existing.stock = pStock || existing.stock;
+            updateCount++;
+          } else {
+            if (!pCode) {
+              pCode = "PRD" + String(db.products.length + 1).padStart(3, '0');
+            }
+            db.products.push({
+              code: pCode,
+              name: pName,
+              unit: pUnit,
+              origin: pOrigin,
+              purchasePrice: pPurchasePrice,
+              salesPrice: pSalesPrice,
+              taxType: pTaxType,
+              stock: pStock
+            });
+            importCount++;
+          }
+        }
+        
+        saveDb();
+        renderProducts();
+        
+        alert(`이지폼 물품 이관 완료!\n- 신규 등록: ${importCount}건\n- 기존 정보 업데이트: ${updateCount}건`);
+        
+      } catch (err) {
+        console.error(err);
+        alert("엑셀 파일을 파싱하는 도중 에러가 발생했습니다. 파일 형식을 확인해 주세요.");
+      } finally {
+        input.value = "";
+      }
+    };
+    
+    reader.readAsArrayBuffer(file);
+  };
+
 });
