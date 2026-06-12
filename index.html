@@ -456,6 +456,24 @@
               <button type="button" class="btn btn-success" onclick="document.getElementById('easyform-partner-excel').click()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;"><i data-lucide="upload" style="width: 16px; height: 16px;"></i> 이지폼 거래처 가져오기 (.xls)</button>
             </div>
           </div>
+          <!-- 거래처 열별 검색 제어 바 -->
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 500px;">
+              <select id="partner-search-filter" style="width: 140px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 8px 12px; outline: none; transition: var(--transition);">
+                <option value="all" style="background-color: #ffffff; color: #1e293b;">전체 컬럼</option>
+                <option value="name" style="background-color: #ffffff; color: #1e293b;">상호명</option>
+                <option value="type" style="background-color: #ffffff; color: #1e293b;">구분 (유형)</option>
+                <option value="owner" style="background-color: #ffffff; color: #1e293b;">대표자</option>
+                <option value="bizNo" style="background-color: #ffffff; color: #1e293b;">사업자번호</option>
+                <option value="phone" style="background-color: #ffffff; color: #1e293b;">전화번호</option>
+                <option value="address" style="background-color: #ffffff; color: #1e293b;">주소</option>
+              </select>
+              <div style="position: relative; flex-grow: 1;">
+                <input type="text" id="partner-search-input" placeholder="검색어를 입력하세요..." style="width: 100%; padding-left: 36px; height: 38px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+              </div>
+            </div>
+          </div>
           <div class="table-container">
             <table>
               <thead>
@@ -533,6 +551,13 @@
             <div style="display: flex; gap: 8px;">
               <input type="file" id="easyform-product-excel" accept=".xlsx, .xls" style="display: none;" onchange="handleEasyFormProductExcel(this)">
               <button type="button" class="btn btn-success" onclick="document.getElementById('easyform-product-excel').click()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;"><i data-lucide="upload" style="width: 16px; height: 16px;"></i> 이지폼 물품 가져오기 (.xls)</button>
+            </div>
+          </div>
+          <!-- 물품 검색 바 -->
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; width: 100%;">
+            <div style="position: relative; width: 100%; max-width: 400px;">
+              <input type="text" id="product-search-input" placeholder="품목명으로 실시간 검색..." style="width: 100%; padding-left: 36px; height: 38px;">
+              <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
             </div>
           </div>
           <div class="table-container">

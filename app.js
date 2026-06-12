@@ -891,7 +891,6 @@ window.deleteBank = function(idx) {
 
 // --- 5. 거래처 정보 CRUD 및 실시간 검색 기능 ---
 const formPartner = document.getElementById("form-partner");
-const partnerSearchInput = document.getElementById("partner-search-input");
 let editingPartnerIndex = null;
 
 function renderPartners() {
@@ -899,15 +898,47 @@ function renderPartners() {
   if(!tbody) return;
   tbody.innerHTML = "";
   
-  const query = partnerSearchInput ? partnerSearchInput.value.toLowerCase().trim() : "";
+  const searchInputEl = document.getElementById("partner-search-input");
+  const searchFilterEl = document.getElementById("partner-search-filter");
+  
+  const query = searchInputEl ? searchInputEl.value.toLowerCase().trim() : "";
+  const filterType = searchFilterEl ? searchFilterEl.value : "all";
   
   db.partners.forEach((p, idx) => {
     // 검색 매칭 필터링
     if (query !== "") {
-      const matchName = p.name.toLowerCase().includes(query);
-      const matchOwner = p.owner && p.owner.toLowerCase().includes(query);
-      const matchCode = p.code.toLowerCase().includes(query);
-      if (!matchName && !matchOwner && !matchCode) return;
+      let isMatch = false;
+      const valName = (p.name || "").toLowerCase();
+      const valType = (p.type || "").toLowerCase();
+      const valOwner = (p.owner || "").toLowerCase();
+      const valBizNo = (p.bizNo || "").toLowerCase().replace(/-/g, '');
+      const valPhone = (p.phone || "").toLowerCase().replace(/[^0-9a-zA-Z]/g, '');
+      const valAddress = (p.address || "").toLowerCase();
+      
+      const queryClean = query.replace(/[^0-9a-zA-Z가-힣]/g, '');
+      
+      if (filterType === "all") {
+        isMatch = valName.includes(query) ||
+                  valType.includes(query) ||
+                  valOwner.includes(query) ||
+                  valBizNo.includes(query) ||
+                  (p.phone && p.phone.toLowerCase().includes(query)) ||
+                  valAddress.includes(query);
+      } else if (filterType === "name") {
+        isMatch = valName.includes(query);
+      } else if (filterType === "type") {
+        isMatch = valType.includes(query);
+      } else if (filterType === "owner") {
+        isMatch = valOwner.includes(query);
+      } else if (filterType === "bizNo") {
+        isMatch = valBizNo.includes(query.replace(/-/g, ''));
+      } else if (filterType === "phone") {
+        isMatch = valPhone.includes(queryClean) || (p.phone && p.phone.toLowerCase().includes(query));
+      } else if (filterType === "address") {
+        isMatch = valAddress.includes(query);
+      }
+      
+      if (!isMatch) return;
     }
     
     const row = document.createElement("tr");
@@ -927,6 +958,18 @@ function renderPartners() {
     tbody.appendChild(row);
   });
 }
+
+// 거래처 검색 바 실시간 리스너 바인딩
+setTimeout(() => {
+  const pSearchInput = document.getElementById("partner-search-input");
+  const pSearchFilter = document.getElementById("partner-search-filter");
+  if (pSearchInput) {
+    pSearchInput.addEventListener("input", renderPartners);
+  }
+  if (pSearchFilter) {
+    pSearchFilter.addEventListener("change", renderPartners);
+  }
+}, 100);
 
 if(formPartner) {
   formPartner.addEventListener("submit", (e) => {
@@ -1015,7 +1058,17 @@ function renderProducts() {
   const tbody = document.getElementById("product-list-rows");
   if(!tbody) return;
   tbody.innerHTML = "";
+  
+  const searchInputEl = document.getElementById("product-search-input");
+  const query = searchInputEl ? searchInputEl.value.toLowerCase().trim() : "";
+
   db.products.forEach((p, idx) => {
+    // 품목명 검색 매칭 필터링
+    if (query !== "") {
+      const matchName = p.name && p.name.toLowerCase().includes(query);
+      if (!matchName) return;
+    }
+
     const row = document.createElement("tr");
     row.innerHTML = `
       <td><code>${escapeHtml(p.code)}</code></td>
@@ -1034,6 +1087,14 @@ function renderProducts() {
     tbody.appendChild(row);
   });
 }
+
+// 물품 검색 바 실시간 리스너 바인딩
+setTimeout(() => {
+  const prodSearchInput = document.getElementById("product-search-input");
+  if (prodSearchInput) {
+    prodSearchInput.addEventListener("input", renderProducts);
+  }
+}, 100);
 
 if(formProduct) {
   formProduct.addEventListener("submit", (e) => {
