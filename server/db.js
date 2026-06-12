@@ -6,6 +6,7 @@ const os = require('os');
 let dbType = 'sqlite';
 let pgPool = null;
 let sqliteDb = null;
+let lastDbError = null;
 
 // sqlite3 모듈 lazy-load
 let sqlite3 = null;
@@ -114,6 +115,7 @@ async function initDb() {
       console.log("PostgreSQL 데이터베이스 연결을 검증하여 활성화했습니다.");
     } catch (e) {
       dbType = 'sqlite';
+      lastDbError = e.message || String(e);
       console.warn("PostgreSQL 연결 검증 실패 (로컬 개발 환경으로 감지). SQLite 모드로 하이브리드 전환합니다. 사유: " + e.message);
     }
   } else {
@@ -364,5 +366,6 @@ module.exports = {
   execute,
   executeInsert,
   initDb,
-  dbType
+  get dbType() { return dbType; },
+  get lastDbError() { return lastDbError; }
 };

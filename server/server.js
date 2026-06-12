@@ -21,6 +21,15 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/erp', require('./routes/erp'));
 app.use('/api/ocr', require('./routes/ocr'));
 
+// DB 연결 진단 API
+app.get('/api/db-status', (req, res) => {
+  res.json({
+    dbType: db.dbType,
+    lastDbError: db.lastDbError || null,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 정적 파일 서빙 대상: 프로젝트 루트 디렉토리를 서빙 (index.html, app.js, style.css)
 const rootPath = path.resolve(__dirname, '../');
 app.use(express.static(rootPath));
