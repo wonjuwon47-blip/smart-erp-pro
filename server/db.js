@@ -19,9 +19,9 @@ try {
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
 let connectionString = process.env.DATABASE_URL || "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres";
 
-// 환경변수에 최신 비밀번호(23Th4781!?!?)가 누락되었거나 구 비밀번호가 설정된 경우를 방어하기 위해 강제 덮어쓰기 적용
-if (connectionString && !connectionString.includes('23Th4781%21%3F%21%3F') && !connectionString.includes('23Th4781!?!?')) {
-  console.warn("환경변수 DATABASE_URL의 비밀번호가 최신이 아니거나 잘못되어 하드코딩된 Supabase 새 연결 주소로 대체합니다.");
+// 환경변수에 올바른 aws-1 호스트 및 최신 비밀번호가 등록되어 있지 않다면 강제로 덮어쓰기 적용
+if (connectionString && (!connectionString.includes('aws-1-ap-northeast-2.pooler.supabase.com') || (!connectionString.includes('23Th4781%21%3F%21%3F') && !connectionString.includes('23Th4781!?!?')))) {
+  console.warn("환경변수 DATABASE_URL의 호스트나 비밀번호가 최신이 아니거나 잘못되어 하드코딩된 Supabase 새 연결 주소로 대체합니다.");
   connectionString = "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres";
 }
 
