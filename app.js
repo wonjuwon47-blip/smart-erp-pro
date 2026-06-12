@@ -190,7 +190,16 @@ const defaultDb = {
   uploadedSchoolFiles: []
 };
 
-let db = JSON.parse(localStorage.getItem("erp_db_pro")) || defaultDb;
+let db = defaultDb;
+try {
+  const localDbStr = localStorage.getItem("erp_db_pro");
+  if (localDbStr) {
+    db = JSON.parse(localDbStr) || defaultDb;
+  }
+} catch (e) {
+  console.warn("로컬 스토리지의 DB 데이터를 파싱하는 도중 에러가 발생해 기본값으로 복구합니다.", e);
+  db = defaultDb;
+}
 
 // 호환성 업데이트
 db.estimates = db.estimates || [];
@@ -5899,9 +5908,16 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("인증 확인 실패 (오프라인 모드 우선 작동):", err);
       const userInfoStr = localStorage.getItem("erp_user_info");
       if (userInfoStr) {
-        const user = JSON.parse(userInfoStr);
-        updateLoginStatusUI(user);
-        authOverlay.style.display = "none";
+        try {
+          const user = JSON.parse(userInfoStr);
+          updateLoginStatusUI(user);
+          authOverlay.style.display = "none";
+        } catch (e) {
+          console.error("로컬 사용자 정보 파싱 오류:", e);
+          localStorage.removeItem("erp_user_info");
+          localStorage.removeItem("erp_jwt_token");
+          authOverlay.style.display = "flex";
+        }
       } else {
         authOverlay.style.display = "flex";
       }
