@@ -1999,7 +1999,7 @@ function triggerInvoicePrintDoc(sale) {
     `;
 
     fullHtml += `
-      <div class="print-invoice-page" style="width: 194mm; height: 132mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
+      <div class="print-invoice-page" style="width: 132mm; height: 194mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
         <div>
           <!-- 상단 타이틀 영역 (초슬림 여백) -->
           <div style="font-size: 13pt; font-weight: bold; text-align: left; color: #000; letter-spacing: 1px; margin-bottom: 0px; white-space: nowrap;">매출거래명세서</div>
@@ -2125,7 +2125,7 @@ function triggerInvoicePrintDoc(sale) {
   injectPrintStyle(`
     @media print {
       @page {
-        size: A5 landscape;
+        size: A5 portrait;
         margin: 8mm 8mm;
       }
       body {
@@ -2135,14 +2135,14 @@ function triggerInvoicePrintDoc(sale) {
       }
       #print-document-area {
         display: block !important;
-        width: 194mm !important;
+        width: 132mm !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
       }
       .print-invoice-page {
-        width: 194mm !important;
-        height: 132mm !important;
+        width: 132mm !important;
+        height: 194mm !important;
         margin: 0 !important;
         padding: 0 !important;
         box-sizing: border-box !important;
@@ -2285,7 +2285,7 @@ function triggerPurchaseInvoicePrintDoc(pur) {
     `;
 
     fullHtml += `
-      <div class="print-invoice-page" style="width: 194mm; height: 132mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
+      <div class="print-invoice-page" style="width: 132mm; height: 194mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: ${page === totalPages - 1 ? 'avoid' : 'always'}; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; box-sizing: border-box;">
         <div>
           <!-- 상단 타이틀 영역 (초슬림 여백) -->
           <div style="font-size: 13pt; font-weight: bold; text-align: left; color: #000; letter-spacing: 1px; margin-bottom: 0px; white-space: nowrap;">매입거래명세서</div>
@@ -2411,7 +2411,7 @@ function triggerPurchaseInvoicePrintDoc(pur) {
   injectPrintStyle(`
     @media print {
       @page {
-        size: A5 landscape;
+        size: A5 portrait;
         margin: 8mm 8mm;
       }
       body {
@@ -2421,14 +2421,14 @@ function triggerPurchaseInvoicePrintDoc(pur) {
       }
       #print-document-area {
         display: block !important;
-        width: 194mm !important;
+        width: 132mm !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
       }
       .print-invoice-page {
-        width: 194mm !important;
-        height: 132mm !important;
+        width: 132mm !important;
+        height: 194mm !important;
         margin: 0 !important;
         padding: 0 !important;
         box-sizing: border-box !important;
