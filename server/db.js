@@ -17,12 +17,12 @@ try {
 }
 
 // Render 등 클라우드 환경에서 DATABASE_URL이 주어지면 PostgreSQL 사용
-let connectionString = process.env.DATABASE_URL || "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres";
+let connectionString = process.env.DATABASE_URL || "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres";
 
 // 환경변수에 최신 비밀번호(23Th4781!?!?)가 누락되었거나 구 비밀번호가 설정된 경우를 방어하기 위해 강제 덮어쓰기 적용
 if (connectionString && !connectionString.includes('23Th4781%21%3F%21%3F') && !connectionString.includes('23Th4781!?!?')) {
   console.warn("환경변수 DATABASE_URL의 비밀번호가 최신이 아니거나 잘못되어 하드코딩된 Supabase 새 연결 주소로 대체합니다.");
-  connectionString = "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres";
+  connectionString = "postgresql://postgres.znxjpftpskucsgevgfah:23Th4781%21%3F%21%3F@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres";
 }
 
 // 디폴트로 SQLite 데이터베이스 준비 (쓰기 권한 보장되는 임시 폴더에 생성)
@@ -35,10 +35,22 @@ if (sqlite3) {
 }
 
 if (connectionString) {
-  pgPool = new Pool({
-    connectionString: connectionString,
-    ssl: { rejectUnauthorized: false }
-  });
+  // connectionString 파싱 문제 및 특수문자 파라미터 오인 방지를 위해 분할 객체 형태로 Pool 생성
+  if (connectionString.includes('pooler.supabase.com')) {
+    pgPool = new Pool({
+      user: 'postgres.znxjpftpskucsgevgfah',
+      password: '23Th4781!?!?',
+      host: 'aws-1-ap-northeast-2.pooler.supabase.com',
+      port: 6543,
+      database: 'postgres',
+      ssl: { rejectUnauthorized: false }
+    });
+  } else {
+    pgPool = new Pool({
+      connectionString: connectionString,
+      ssl: { rejectUnauthorized: false }
+    });
+  }
 }
 
 // 공용 쿼리 실행 헬퍼 (SELECT용)
@@ -104,11 +116,24 @@ async function initDb() {
   if (connectionString) {
     try {
       // 3초 연결 타임아웃 테스트를 통해 PostgreSQL 가용 여부 판별
-      const tempPool = new Pool({
-        connectionString: connectionString,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 3000
-      });
+      let tempPool;
+      if (connectionString.includes('pooler.supabase.com')) {
+        tempPool = new Pool({
+          user: 'postgres.znxjpftpskucsgevgfah',
+          password: '23Th4781!?!?',
+          host: 'aws-1-ap-northeast-2.pooler.supabase.com',
+          port: 6543,
+          database: 'postgres',
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 3000
+        });
+      } else {
+        tempPool = new Pool({
+          connectionString: connectionString,
+          ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 3000
+        });
+      }
       await tempPool.query('SELECT 1');
       await tempPool.end();
       dbType = 'postgres';
