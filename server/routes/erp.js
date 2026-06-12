@@ -123,7 +123,7 @@ router.get('/products', async (req, res) => {
 
 // 품목 신규 등록
 router.post('/products', async (req, res) => {
-  const { code, name, unit, origin, purchasePrice, salesPrice, taxType, stock } = req.body;
+  const { code, name, category, abbreviation, unit, origin, purchasePrice, salesPrice, taxType, stock } = req.body;
 
   if (!code || !name) {
     return res.status(400).json({ error: "품목 코드와 품목명은 필수 입력 항목입니다." });
@@ -140,11 +140,13 @@ router.post('/products', async (req, res) => {
     }
 
     const productId = await db.executeInsert(
-      "INSERT INTO products (company_id, code, name, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO products (company_id, code, name, category, abbreviation, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         req.user.root_company_id,
         code,
         name,
+        category || null,
+        abbreviation || null,
         unit || 'EA',
         origin || '국내산',
         parseInt(purchasePrice, 10) || 0,
@@ -163,7 +165,7 @@ router.post('/products', async (req, res) => {
 
 // 품목 정보 수정 (재고 조정 및 단가 갱신 포함)
 router.put('/products/:id', async (req, res) => {
-  const { code, name, unit, origin, purchasePrice, salesPrice, taxType, stock } = req.body;
+  const { code, name, category, abbreviation, unit, origin, purchasePrice, salesPrice, taxType, stock } = req.body;
   const productId = req.params.id;
 
   try {
@@ -176,10 +178,12 @@ router.put('/products/:id', async (req, res) => {
     }
 
     await db.execute(
-      "UPDATE products SET code = ?, name = ?, unit = ?, origin = ?, purchase_price = ?, sales_price = ?, tax_type = ?, stock = ? WHERE id = ?",
+      "UPDATE products SET code = ?, name = ?, category = ?, abbreviation = ?, unit = ?, origin = ?, purchase_price = ?, sales_price = ?, tax_type = ?, stock = ? WHERE id = ?",
       [
         code,
         name,
+        category || null,
+        abbreviation || null,
         unit || 'EA',
         origin || '국내산',
         parseInt(purchasePrice, 10) || 0,
@@ -1052,8 +1056,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.products)) {
       for (const prod of backup.products) {
         await db.execute(
-          "INSERT INTO products (id, company_id, code, name, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [prod.id, companyId, prod.code, prod.name, prod.unit || 'EA', prod.origin || '국내산', prod.purchase_price || 0, prod.sales_price || 0, prod.tax_type || '과세', prod.stock || 0]
+          "INSERT INTO products (id, company_id, code, name, category, abbreviation, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [prod.id, companyId, prod.code, prod.name, prod.category || null, prod.abbreviation || null, prod.unit || 'EA', prod.origin || '국내산', prod.purchase_price || 0, prod.sales_price || 0, prod.tax_type || '과세', prod.stock || 0]
         );
       }
     }

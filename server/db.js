@@ -206,6 +206,8 @@ async function initDb() {
         company_id INTEGER NOT NULL,
         code VARCHAR(50) NOT NULL,
         name VARCHAR(100) NOT NULL,
+        category VARCHAR(100) DEFAULT NULL,
+        abbreviation VARCHAR(50) DEFAULT NULL,
         unit VARCHAR(20) DEFAULT 'EA',
         origin VARCHAR(50) DEFAULT '국내산',
         purchase_price INTEGER DEFAULT 0,
@@ -382,6 +384,16 @@ async function initDb() {
     }
     try {
       await execute("ALTER TABLE settings ADD COLUMN last_updated NUMERIC DEFAULT 0");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
+    try {
+      await execute("ALTER TABLE products ADD COLUMN category VARCHAR(100)");
+    } catch (e) {
+      // 이미 컬럼이 존재하면 정상 패스
+    }
+    try {
+      await execute("ALTER TABLE products ADD COLUMN abbreviation VARCHAR(50)");
     } catch (e) {
       // 이미 컬럼이 존재하면 정상 패스
     }

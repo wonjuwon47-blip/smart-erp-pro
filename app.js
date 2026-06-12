@@ -1099,6 +1099,8 @@ function renderProducts() {
     row.innerHTML = `
       <td><code>${escapeHtml(p.code)}</code></td>
       <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.category || "")}</td>
+      <td>${escapeHtml(p.abbreviation || "")}</td>
       <td>${escapeHtml(p.unit)}</td>
       <td><span style="color: var(--accent-color);">${escapeHtml(p.origin)}</span></td>
       <td>${formatNumber(p.purchasePrice)} 원</td>
@@ -1128,6 +1130,8 @@ if(formProduct) {
     const updatedProduct = {
       code: document.getElementById("prod-code").value,
       name: document.getElementById("prod-name").value,
+      category: document.getElementById("prod-category").value,
+      abbreviation: document.getElementById("prod-abbreviation").value,
       unit: document.getElementById("prod-unit").value,
       origin: document.getElementById("prod-origin").value,
       purchasePrice: parseInt(document.getElementById("prod-purchase-price").value) || 0,
@@ -1161,6 +1165,8 @@ window.editProduct = function(idx) {
   editingProductIndex = idx;
   document.getElementById("prod-code").value = p.code || "";
   document.getElementById("prod-name").value = p.name || "";
+  document.getElementById("prod-category").value = p.category || "";
+  document.getElementById("prod-abbreviation").value = p.abbreviation || "";
   document.getElementById("prod-unit").value = p.unit || "";
   document.getElementById("prod-origin").value = p.origin || "";
   document.getElementById("prod-purchase-price").value = p.purchasePrice || 0;
@@ -6435,7 +6441,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!itemName) return { name: "", prefix: "" };
     const name = String(itemName).trim();
     
-    // 감자 통합 규칙
+    // db.products에서 정확히 일치하는 물품이 있는지 찾는다.
+    if (db && Array.isArray(db.products)) {
+      const prod = db.products.find(p => p.name === name);
+      if (prod) {
+        const category = prod.category ? String(prod.category).trim() : "";
+        const abbreviation = prod.abbreviation ? String(prod.abbreviation).trim() : "";
+        if (category) {
+          return { name: category, prefix: abbreviation };
+        }
+      }
+    }
+    
+    // 하위 호환성을 위한 하드코딩 폴백 규칙
     if (name.includes("감자")) {
       if (name.includes("친환경")) {
         return { name: "감자", prefix: "친" };
@@ -6443,7 +6461,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return { name: "감자", prefix: "" };
     }
     
-    // 생강 통합 규칙
     if (name.includes("생강")) {
       if (name.includes("깐")) {
         return { name: "생강", prefix: "깐" };
