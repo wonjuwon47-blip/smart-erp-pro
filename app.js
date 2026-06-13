@@ -2144,21 +2144,31 @@ function triggerLabelPrintDoc(sale) {
   const width = db.settings.labelWidth || 60;
   const height = db.settings.labelHeight || 60;
   injectPrintStyle(`
+    @page {
+      size: ${width}mm ${height}mm;
+      margin: 0mm;
+    }
     @media print {
-      @page {
-        size: ${width}mm ${height}mm;
-        margin: 0mm;
-      }
       html, body {
         margin: 0 !important;
         padding: 0 !important;
-        width: ${width}mm;
-        height: ${height}mm;
+        width: ${width}mm !important;
+        height: ${height}mm !important;
+        overflow: hidden !important;
+      }
+      #print-document-area {
+        width: ${width}mm !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
       .print-label-box {
+        width: ${width}mm !important;
+        height: ${height}mm !important;
         margin: 0 !important;
         padding: 0 !important;
         page-break-inside: avoid;
+        overflow: hidden !important;
       }
     }
   `);
