@@ -125,6 +125,10 @@
               <i data-lucide="clipboard-list"></i>
               <span>통합 발주표 관리</span>
             </li>
+            <li class="menu-item" data-tab="daily-verification">
+              <i data-lucide="clipboard-check"></i>
+              <span>일일 품목확인서</span>
+            </li>
             <li class="menu-item" data-tab="receivables">
               <i data-lucide="wallet"></i>
               <span>외상대금/미수금 관리</span>
@@ -169,6 +173,11 @@
           <p id="current-tab-desc">회사 핵심 정보 요약 및 활성 본사 설정을 조회합니다.</p>
         </div>
         <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <select id="company-branch-selector" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(167, 139, 250, 0.25); border: 1px solid rgba(167, 139, 250, 0.5); border-radius: 6px; color: #fff; outline: none; display: none;">
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
           <div class="form-group" style="margin-bottom: 0;">
             <select id="active-hq-selector" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(167, 139, 250, 0.15); border-color: var(--primary-color);">
               <!-- Loaded dynamically -->
@@ -247,6 +256,7 @@
         <div class="card">
           <div class="inner-tabs">
             <div class="inner-tab active" data-subtab="subtab-hq-settings">본사/지사 정보 등록</div>
+            <div id="tab-btn-branch-settings" class="inner-tab" data-subtab="subtab-branch-settings" style="display: none;">지사(지점) 관리</div>
             <div class="inner-tab" data-subtab="subtab-employee-settings">사원 정보 관리</div>
             <div class="inner-tab" data-subtab="subtab-bank-settings">은행 계좌 관리</div>
           </div>
@@ -305,6 +315,38 @@
                   </tr>
                 </thead>
                 <tbody id="hq-list-rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Subtab: 지사(지점) 관리 -->
+          <div id="subtab-branch-settings" class="inner-tab-content">
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">본사의 하위 지사(지점)를 새로 생성하여 다중 계정 체계를 관리합니다.</p>
+            <form id="form-branch-add" style="margin-bottom: 24px;">
+              <div class="form-grid" style="grid-template-columns: 2fr 1fr; gap: 12px; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>지사(지점) 상호명</label>
+                  <input type="text" id="branch-add-name" placeholder="예: (주)푸드유통 서울강남점" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="height: 38px;"><i data-lucide="plus"></i> 신규 지사 개설</button>
+              </div>
+            </form>
+
+            <h3>등록된 하위 지사 목록</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>지사 번호(ID)</th>
+                    <th>지점 상호명</th>
+                    <th>개설일자</th>
+                  </tr>
+                </thead>
+                <tbody id="branch-list-rows">
+                  <tr>
+                    <td colspan="3" style="text-align: center; color: var(--text-muted);">등록된 지사 정보가 없습니다.</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>
@@ -415,15 +457,19 @@
                 <input type="text" id="partner-name" placeholder="예: 한울농산" required>
               </div>
               <div class="form-group">
+                <label>거래처 약어 (일일확인서용)</label>
+                <input type="text" id="partner-abbreviation" placeholder="예: 강남초">
+              </div>
+              <div class="form-group">
                 <label>대표자 성명</label>
                 <input type="text" id="partner-owner" placeholder="최대표" required>
               </div>
+            </div>
+            <div class="form-grid">
               <div class="form-group">
                 <label>사업자 등록 번호</label>
                 <input type="text" id="partner-biz-no" placeholder="123-45-67890" required>
               </div>
-            </div>
-            <div class="form-grid">
               <div class="form-group">
                 <label>전화번호</label>
                 <input type="text" id="partner-phone" placeholder="02-1234-5678">
@@ -432,6 +478,8 @@
                 <label>사업장 주소</label>
                 <input type="text" id="partner-address" placeholder="경기도 여주시 ...">
               </div>
+            </div>
+            <div class="form-grid" style="margin-top: 12px;">
               <div class="form-group">
                 <label>거래 유형</label>
                 <select id="partner-type">
@@ -440,19 +488,50 @@
                   <option value="매출처">매출처 전용</option>
                 </select>
               </div>
+              <div class="form-group"></div>
+              <div class="form-group"></div>
+              <div class="form-group"></div>
             </div>
-            <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> 거래처 정보 등록</button>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="submit" class="btn btn-primary" id="btn-partner-submit"><i data-lucide="plus"></i> 거래처 정보 등록</button>
+              <button type="button" class="btn btn-secondary" id="btn-cancel-partner-edit" style="display: none;">수정 취소</button>
+            </div>
           </form>
         </div>
 
         <div class="card">
-          <h2>거래처 관리 리스트</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="users" style="color: var(--primary-color);"></i> 거래처 관리 리스트</h2>
+            <div style="display: flex; gap: 8px;">
+              <input type="file" id="easyform-partner-excel" accept=".xlsx, .xls" style="display: none;" onchange="handleEasyFormPartnerExcel(this)">
+              <button type="button" class="btn btn-success" onclick="document.getElementById('easyform-partner-excel').click()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;"><i data-lucide="upload" style="width: 16px; height: 16px;"></i> 이지폼 거래처 가져오기 (.xls)</button>
+            </div>
+          </div>
+          <!-- 거래처 열별 검색 제어 바 -->
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 8px; width: 100%; max-width: 500px;">
+              <select id="partner-search-filter" style="width: 140px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; padding: 8px 12px; outline: none; transition: var(--transition);">
+                <option value="all" style="background-color: #ffffff; color: #1e293b;">전체 컬럼</option>
+                <option value="name" style="background-color: #ffffff; color: #1e293b;">상호명</option>
+                <option value="type" style="background-color: #ffffff; color: #1e293b;">구분 (유형)</option>
+                <option value="owner" style="background-color: #ffffff; color: #1e293b;">대표자</option>
+                <option value="bizNo" style="background-color: #ffffff; color: #1e293b;">사업자번호</option>
+                <option value="phone" style="background-color: #ffffff; color: #1e293b;">전화번호</option>
+                <option value="address" style="background-color: #ffffff; color: #1e293b;">주소</option>
+              </select>
+              <div style="position: relative; flex-grow: 1;">
+                <input type="text" id="partner-search-input" placeholder="검색어를 입력하세요..." style="width: 100%; padding-left: 36px; height: 38px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+              </div>
+            </div>
+          </div>
           <div class="table-container">
             <table>
               <thead>
                 <tr>
                   <th>코드</th>
                   <th>상호명</th>
+                  <th>약어</th>
                   <th>구분</th>
                   <th>대표자</th>
                   <th>사업자번호</th>
@@ -511,18 +590,48 @@
                 <input type="number" id="prod-stock" value="0" required>
               </div>
             </div>
-            <button type="submit" class="btn btn-primary"><i data-lucide="plus"></i> 물품 정보 저장</button>
+            <div class="form-grid" style="margin-top: 12px;">
+              <div class="form-group">
+                <label>카테고리 (일일확인서 통합용)</label>
+                <input type="text" id="prod-category" placeholder="예: 감자 (유사품목 통합 기준명)">
+              </div>
+              <div class="form-group">
+                <label>약어 (수량 표기 접두사)</label>
+                <input type="text" id="prod-abbreviation" placeholder="예: 친 (수량 앞 표시 접두어)">
+              </div>
+              <div class="form-group"></div>
+              <div class="form-group"></div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="submit" class="btn btn-primary" id="btn-product-submit"><i data-lucide="plus"></i> 물품 정보 저장</button>
+              <button type="button" class="btn btn-secondary" id="btn-cancel-product-edit" style="display: none;">수정 취소</button>
+            </div>
           </form>
         </div>
 
         <div class="card">
-          <h2>기준 물품 일람표</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="boxes" style="color: var(--primary-color);"></i> 기준 물품 일람표</h2>
+            <div style="display: flex; gap: 8px;">
+              <input type="file" id="easyform-product-excel" accept=".xlsx, .xls" style="display: none;" onchange="handleEasyFormProductExcel(this)">
+              <button type="button" class="btn btn-success" onclick="document.getElementById('easyform-product-excel').click()" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 6px 12px;"><i data-lucide="upload" style="width: 16px; height: 16px;"></i> 이지폼 물품 가져오기 (.xls)</button>
+            </div>
+          </div>
+          <!-- 물품 검색 바 -->
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; width: 100%;">
+            <div style="position: relative; width: 100%; max-width: 400px;">
+              <input type="text" id="product-search-input" placeholder="품목명으로 실시간 검색..." style="width: 100%; padding-left: 36px; height: 38px;">
+              <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);"></i>
+            </div>
+          </div>
           <div class="table-container">
             <table>
               <thead>
                 <tr>
                   <th>코드</th>
                   <th>품목명</th>
+                  <th>카테고리</th>
+                  <th>약어</th>
                   <th>규격</th>
                   <th>원산지</th>
                   <th>매입단가</th>
@@ -576,7 +685,10 @@
                 </div>
                 <div class="form-group">
                   <label>공급자 (매입처)</label>
-                  <select id="pur-partner" required></select>
+                  <div class="searchable-select-container" style="position: relative; width: 100%;">
+                    <input type="text" id="pur-partner" placeholder="검색 또는 직접 입력..." required autocomplete="off" style="width: 100%;">
+                    <div id="pur-partner-dropdown" class="searchable-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--panel-border); border-radius: 8px; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); margin-top: 4px;"></div>
+                  </div>
                 </div>
               </div>
 
@@ -715,7 +827,10 @@
               </div>
               <div class="form-group">
                 <label>매출처 (거래처)</label>
-                <select id="sales-partner" required></select>
+                <div class="searchable-select-container" style="position: relative; width: 100%;">
+                  <input type="text" id="sales-partner" placeholder="검색 또는 직접 입력..." required autocomplete="off" style="width: 100%;">
+                  <div id="sales-partner-dropdown" class="searchable-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--panel-border); border-radius: 8px; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); margin-top: 4px;"></div>
+                </div>
               </div>
               <div class="form-group">
                 <label>수금 구분</label>
@@ -1024,6 +1139,9 @@
         </div>
 
         <div id="order-sheet-data-container" style="display: none; position: relative;">
+          <!-- 실시간 교차 검증 상태 패널 -->
+          <div id="order-sheet-validation-panel" class="no-print" style="margin-bottom: 20px; display: none;"></div>
+
           <!-- 일괄 전표 생성 영역 -->
           <div class="card" style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
@@ -1095,6 +1213,33 @@
               <button type="button" class="btn btn-secondary" id="btn-filter-cancel" style="padding: 4px 8px; font-size: 0.75rem; height: auto;">닫기</button>
               <button type="button" class="btn btn-primary" id="btn-filter-apply" style="padding: 4px 12px; font-size: 0.75rem; height: auto; font-weight: bold;">적용</button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: DAILY VERIFICATION -->
+      <section id="tab-daily-verification" class="tab-content">
+        <div class="card" style="margin-bottom: 20px;">
+          <h2 style="margin-bottom: 8px;">일일 품목확인서 조회</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">지정한 배송 일자에 각 학교(거래처)로 납품될 물품들의 총 수량을 격자판 피벗 형태로 집계하고 인쇄용 서류를 출력합니다.</p>
+          
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div class="form-group" style="margin-bottom: 0; min-width: 180px;">
+              <label style="font-size: 0.8rem; margin-bottom: 4px;">배송 일자 선택</label>
+              <input type="date" id="daily-verif-date" style="height: 38px; padding: 6px 12px;">
+            </div>
+            <button type="button" class="btn btn-primary" id="btn-daily-verif-search" style="height: 38px; padding: 0 20px; font-weight: bold; margin-top: 18px;"><i data-lucide="search"></i> 조회하기</button>
+            <button type="button" class="btn" id="btn-daily-verif-print" style="height: 38px; padding: 0 20px; font-weight: bold; margin-top: 18px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; display: none;"><i data-lucide="printer"></i> 확인서 인쇄하기</button>
+          </div>
+        </div>
+
+        <!-- 데이터 교차 검증 통계 패널 (물류 누락 방지용) -->
+        <div id="daily-verif-validation-panel" class="no-print" style="margin-bottom: 20px; display: none;"></div>
+
+        <!-- 일일 품목확인서 렌더링 컨테이너 -->
+        <div id="daily-verif-print-area" class="daily-verif-print-container">
+          <div id="daily-verif-empty-state" class="card" style="text-align: center; padding: 40px; color: var(--text-muted);">
+            배송 일자를 선택하고 조회하기 단추를 눌러주세요.
           </div>
         </div>
       </section>
@@ -1204,39 +1349,84 @@
 
           <!-- Left: 라벨 스티커 디자인 설정 -->
           <div class="card" style="margin-top: 20px;">
-            <h2>라벨 스티커 디자인 설정 (60mm x 60mm 감열 규격)</h2>
-            <form id="form-label-settings" style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 16px;">
+              <h2 style="margin: 0; display: flex; align-items: center; gap: 8px;"><i data-lucide="settings" style="color: var(--primary-color);"></i> 라벨 스티커 디자인 및 프린터 설정</h2>
+              <span style="background: rgba(96, 165, 250, 0.15); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3); font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">
+                <span style="width: 6px; height: 6px; background-color: #60a5fa; border-radius: 50%; display: inline-block;"></span> HPRT SL43 최적화 지원
+              </span>
+            </div>
+            
+            <!-- HPRT SL43 프린터 연결 및 설정 가이드 (Glassmorphism & Pastel Accent) -->
+            <div style="background: rgba(96, 165, 250, 0.04); border: 1px solid rgba(96, 165, 250, 0.12); border-radius: 12px; padding: 18px; font-size: 0.85rem; line-height: 1.6; margin-bottom: 20px;">
+              <h3 style="color: #60a5fa; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700;">
+                <i data-lucide="printer" style="width: 18px; height: 18px; color: #60a5fa;"></i> HPRT SL43 라벨 프린터 웹 연동 가이드
+              </h3>
+              <ul style="padding-left: 20px; margin: 0; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px; list-style-type: decimal;">
+                <li><strong style="color: #fff;">드라이버 설치:</strong> PC에 HPRT SL43 감열 프린터 드라이버가 정상 설치되었는지 확인하십시오.</li>
+                <li><strong style="color: #fff;">프린터 용지 크기 기본값 설정:</strong> 제어판 &gt; 장치 및 프린터 &gt; 'SL43' 마우스 우클릭 &gt; <span style="color: var(--primary-color); font-weight: bold;">[인쇄 기본 설정]</span>에서 장착한 라벨지 크기(예: 60x60mm 또는 100x100mm 등)를 정확하게 생성 및 지정해야 밀림이 없습니다.</li>
+                <li><strong style="color: #fff;">브라우저 인쇄 설정 매칭:</strong> 인쇄 대화상자가 열리면 대상을 <span style="color: var(--primary-color); font-weight: bold;">[HPRT SL43]</span>으로 선택하고 설정에서 <strong>여백 '없음'</strong>, <strong>배경 그래픽 '체크'</strong>로 인쇄해 주십시오.</li>
+              </ul>
+            </div>
+
+            <form id="form-label-settings" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>라벨 용지 규격 선택</label>
+                  <select id="setting-lbl-size-preset" onchange="handleLabelPresetChange(this.value)">
+                    <option value="60x60">60mm x 60mm (기본 정사각형)</option>
+                    <option value="80x80">80mm x 80mm (대형 정사각형)</option>
+                    <option value="100x100">100mm x 100mm (HPRT SL43 대형 규격)</option>
+                    <option value="100x60">100mm x 60mm (HPRT SL43 직사각형)</option>
+                    <option value="40x30">40mm x 30mm (HPRT SL43 소형 규격)</option>
+                    <option value="custom">직접 지정 (Custom)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="display: flex; flex-direction: row; gap: 12px; align-items: flex-end;">
+                  <div style="flex: 1;">
+                    <label>가로 크기 (Width, mm)</label>
+                    <input type="number" id="setting-lbl-width" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                  </div>
+                  <div style="flex: 1;">
+                    <label>세로 크기 (Height, mm)</label>
+                    <input type="number" id="setting-lbl-height" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                  </div>
+                </div>
+              </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>공급처 (본사명) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-title" value="22" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-title" value="22" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>품종 (품목명) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-product" value="22" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-product" value="22" min="6" max="48" step="0.5">
                 </div>
               </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>산지 (원산지) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-origin" value="18" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-origin" value="18" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>무게 (수량) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-weight" value="28" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-weight" value="28" min="6" max="48" step="0.5">
                 </div>
               </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label>공급자 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-supplier" value="10.5" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-supplier" value="10.5" min="6" max="48" step="0.5">
                 </div>
                 <div class="form-group">
                   <label>포장일 (입고일) 글꼴 크기 (pt)</label>
-                  <input type="number" id="setting-lbl-font-date" value="23" min="6" max="36" step="0.5">
+                  <input type="number" id="setting-lbl-font-date" value="23" min="6" max="48" step="0.5">
                 </div>
               </div>
-              <button type="submit" class="btn btn-primary" style="margin-top: 16px;"><i data-lucide="save"></i> 라벨 디자인 설정 저장</button>
+              
+              <div style="display: flex; gap: 12px; margin-top: 8px;">
+                <button type="submit" class="btn btn-primary" style="flex: 2; height: 44px;"><i data-lucide="save"></i> 설정 저장</button>
+                <button type="button" class="btn btn-success" onclick="printLabelTest()" style="flex: 1; height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;"><i data-lucide="printer"></i> 테스트 인쇄</button>
+              </div>
             </form>
           </div>
 
@@ -1307,9 +1497,154 @@
     .spin-icon {
       display: inline-block;
     }
+
+    /* 일일 품목확인서 전용 스타일 */
+    .daily-verif-print-container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    .daily-verif-page {
+      background: rgba(30, 30, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 24px;
+      box-sizing: border-box;
+      backdrop-filter: blur(10px);
+    }
+    .daily-verif-title {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 15px;
+    }
+    .daily-verif-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #fff;
+      background: transparent;
+      table-layout: fixed;
+    }
+    .daily-verif-table th, .daily-verif-table td {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 4px;
+      width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
+      box-sizing: border-box;
+      outline: none;
+      word-break: break-all;
+      overflow: hidden;
+    }
+    .daily-verif-table th {
+      height: 35px !important;
+    }
+    .daily-verif-table td {
+      height: 25.5px !important;
+    }
+    /* 2열 마다 우측에 붉은색 경계선 강조 */
+    .daily-verif-table th:nth-child(2n+1), 
+    .daily-verif-table td:nth-child(2n+1) {
+      border-right: 2px solid #ef4444 !important;
+    }
+    /* 5행 마다 하단에 붉은색 경계선 강조 */
+    .daily-verif-table tbody tr:nth-child(5n) td {
+      border-bottom: 2px solid #ef4444 !important;
+    }
+    .daily-verif-table th {
+      background: rgba(167, 139, 250, 0.18) !important;
+      color: #fff;
+      font-weight: bold;
+    }
+    .daily-verif-table td.row-header {
+      background: rgba(255, 255, 255, 0.03) !important;
+      font-weight: bold;
+      text-align: left;
+      padding-left: 8px;
+    }
+    .daily-verif-table td.col-total {
+      background: rgba(255, 255, 255, 0.05) !important;
+      font-weight: bold;
+      color: #c084fc;
+    }
+
+    /* 인쇄 모드 전용 스타일 */
+    @media print {
+      /* style.css에 정의된 body > *:not(#print-document-area) { display: none !important; } 가 적용되므로
+         우리는 #print-document-area 내에 복제되어 들어갈 요소들의 스타일만 정의합니다. */
+      
+      #print-document-area {
+        display: block !important;
+        background: #fff !important;
+        color: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      .daily-verif-page {
+        page-break-after: always;
+        background: #fff !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 0 15mm 0 !important;
+        color: #000 !important;
+        display: block !important;
+      }
+      .daily-verif-title {
+        color: #000 !important;
+        font-size: 1.8rem;
+      }
+      .daily-verif-excel-header {
+        color: #000 !important;
+      }
+      .daily-verif-meta, .daily-verif-meta strong {
+        color: #000 !important;
+      }
+      .daily-verif-table {
+        color: #000 !important;
+        table-layout: fixed !important;
+        width: 100% !important;
+      }
+      .daily-verif-table th, .daily-verif-table td {
+        width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
+      }
+      .daily-verif-table th {
+        height: 35px !important;
+      }
+      .daily-verif-table td {
+        height: 25.5px !important;
+      }
+      .daily-verif-table th {
+        background: #e5e7eb !important;
+        border: 1px solid #000 !important;
+        color: #000 !important;
+      }
+      .daily-verif-table th:nth-child(2n+1), 
+      .daily-verif-table td:nth-child(2n+1) {
+        border-right: 2px solid #ef4444 !important;
+      }
+      .daily-verif-table tbody tr:nth-child(5n) td {
+        border-bottom: 2px solid #ef4444 !important;
+      }
+      .daily-verif-table td {
+        border: 1px solid #9ca3af !important;
+        color: #000 !important;
+      }
+      .daily-verif-table td.row-header {
+        background: #f9fafb !important;
+        color: #000 !important;
+      }
+      .daily-verif-table td.col-total {
+        background: #f3f4f6 !important;
+        color: #000 !important;
+      }
+    }
   </style>
 
   <!-- ERP Logic Script -->
-  <script src="app.js"></script>
+  <script src="app.js?v=20260612_v4"></script>
 </body>
 </html>

@@ -366,7 +366,7 @@ async function initDb() {
         hk_f7 VARCHAR(50) DEFAULT 'purchase',
         hk_f8 VARCHAR(50) DEFAULT 'receivables',
         hk_f9 VARCHAR(50) DEFAULT 'excel-import',
-        active_hq_id INTEGER DEFAULT NULL,
+        active_hq_id VARCHAR(50) DEFAULT NULL,
         uploaded_files_json TEXT DEFAULT NULL,
         last_updated NUMERIC DEFAULT 0
       )
@@ -387,6 +387,13 @@ async function initDb() {
       await execute("ALTER TABLE settings ADD COLUMN last_updated NUMERIC DEFAULT 0");
     } catch (e) {
       // 이미 컬럼이 존재하면 정상 패스
+    }
+    try {
+      if (isPg) {
+        await execute("ALTER TABLE settings ALTER COLUMN active_hq_id TYPE VARCHAR(50)");
+      }
+    } catch (e) {
+      // 이미 변경되었거나 오류 시 패스
     }
     try {
       await execute("ALTER TABLE products ADD COLUMN category VARCHAR(100)");
