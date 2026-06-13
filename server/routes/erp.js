@@ -954,6 +954,78 @@ router.post('/settings', async (req, res) => {
 // 10. 백업 및 초기화 API
 // ==========================================
 
+// --- 카멜케이스 변환 헬퍼 함수 ---
+function toCamelCase(obj, type) {
+  if (!obj) return null;
+  if (type === 'partner') {
+    return {
+      id: obj.id,
+      code: obj.code,
+      name: obj.name,
+      abbreviation: obj.abbreviation,
+      owner: obj.owner,
+      bizNo: obj.biz_no,
+      address: obj.address,
+      phone: obj.phone,
+      type: obj.type
+    };
+  }
+  if (type === 'product') {
+    return {
+      id: obj.id,
+      code: obj.code,
+      name: obj.name,
+      category: obj.category,
+      abbreviation: obj.abbreviation,
+      unit: obj.unit,
+      origin: obj.origin,
+      purchasePrice: Number(obj.purchase_price || 0),
+      salesPrice: Number(obj.sales_price || 0),
+      taxType: obj.tax_type,
+      stock: Number(obj.stock || 0)
+    };
+  }
+  if (type === 'headquarters') {
+    return {
+      id: obj.id,
+      name: obj.name,
+      regNo: obj.reg_no,
+      owner: obj.owner,
+      address: obj.address,
+      phone: obj.phone,
+      business: obj.business,
+      stamp: obj.stamp
+    };
+  }
+  if (type === 'bank') {
+    return {
+      id: obj.id,
+      name: obj.name,
+      accNo: obj.acc_no,
+      owner: obj.owner,
+      balance: Number(obj.balance || 0)
+    };
+  }
+  if (type === 'settings') {
+    return {
+      paperSize: obj.paper_size,
+      marginTop: Number(obj.margin_top || 15),
+      marginLeft: Number(obj.margin_left || 15),
+      fontSize: Number(obj.font_size || 10),
+      logoText: obj.logo_text,
+      hkF2: obj.hk_f2,
+      hkF4: obj.hk_f4,
+      hkF7: obj.hk_f7,
+      hkF8: obj.hk_f8,
+      hkF9: obj.hk_f9,
+      activeHqId: obj.active_hq_id,
+      uploadedFilesJson: obj.uploaded_files_json,
+      lastUpdated: Number(obj.last_updated || 0)
+    };
+  }
+  return obj;
+}
+
 router.get('/backup/export', async (req, res) => {
   const companyId = req.user.company_id;
   try {
@@ -989,17 +1061,17 @@ router.get('/backup/export', async (req, res) => {
       version: "smart-erp-pro-v1",
       exportedAt: new Date().toISOString(),
       companyId,
-      partners,
-      products,
+      partners: partners.map(p => toCamelCase(p, 'partner')),
+      products: products.map(p => toCamelCase(p, 'product')),
       invoices,
       invoiceItems,
-      headquarters,
+      headquarters: headquarters.map(h => toCamelCase(h, 'headquarters')),
       employees,
-      banks,
+      banks: banks.map(b => toCamelCase(b, 'bank')),
       estimates,
-      estimateItems,
+      estimateItems: estItems,
       receivablesPayments,
-      settings: settings[0] || null
+      settings: settings[0] ? toCamelCase(settings[0], 'settings') : null
     };
 
     res.json(backupData);
@@ -1031,13 +1103,34 @@ router.post('/backup/import', async (req, res) => {
     await db.execute("DELETE FROM receivables_payments WHERE company_id = ?", [companyId]);
     await db.execute("DELETE FROM settings WHERE company_id = ?", [companyId]);
 
+    // PostgreSQL 시퀀스 동기화 (Auto Increment 충돌 방지)
+    const syncSequence = async (tableName) => {
+      if (db.dbType === 'postgres') {
+        try {
+          await db.execute(`SELECT setval(pg_get_serial_sequence('${tableName}', 'id'), coalesce(max(id), 0) + 1, false) FROM ${tableName}`);
+        } catch (e) {
+          console.warn(`[WARN] Sequence sync failed for ${tableName}:`, e.message);
+        }
+      }
+    };
+
+    await syncSequence('headquarters');
+    await syncSequence('partners');
+    await syncSequence('products');
+    await syncSequence('invoices');
+    await syncSequence('invoice_items');
+    await syncSequence('employees');
+    await syncSequence('banks');
+    await syncSequence('receivables_payments');
+    await syncSequence('estimate_items');
+
     // 2. 순차 복원
     // 2.1 본사
     if (Array.isArray(backup.headquarters)) {
       for (const hq of backup.headquarters) {
         await db.execute(
-          "INSERT INTO headquarters (id, company_id, name, reg_no, owner, address, phone, business, stamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [hq.id, companyId, hq.name, hq.reg_no || '', hq.owner || '', hq.address || '', hq.phone || '', hq.business || '', hq.stamp || '']
+          "INSERT INTO headquarters (company_id, name, reg_no, owner, address, phone, business, stamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [companyId, hq.name, hq.regNo || hq.reg_no || '', hq.owner || '', hq.address || '', hq.phone || '', hq.business || '', hq.stamp || '']
         );
       }
     }
@@ -1046,8 +1139,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.partners)) {
       for (const p of backup.partners) {
         await db.execute(
-          "INSERT INTO partners (id, company_id, code, name, abbreviation, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [p.id, companyId, p.code, p.name, p.abbreviation || null, p.owner || '', p.biz_no || '', p.address || '', p.phone || '', p.type]
+          "INSERT INTO partners (company_id, code, name, abbreviation, owner, biz_no, address, phone, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [companyId, p.code, p.name, p.abbreviation || null, p.owner || '', p.bizNo || p.biz_no || '', p.address || '', p.phone || '', p.type]
         );
       }
     }
@@ -1056,26 +1149,35 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.products)) {
       for (const prod of backup.products) {
         await db.execute(
-          "INSERT INTO products (id, company_id, code, name, category, abbreviation, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [prod.id, companyId, prod.code, prod.name, prod.category || null, prod.abbreviation || null, prod.unit || 'EA', prod.origin || '국내산', prod.purchase_price || 0, prod.sales_price || 0, prod.tax_type || '과세', prod.stock || 0]
+          "INSERT INTO products (company_id, code, name, category, abbreviation, unit, origin, purchase_price, sales_price, tax_type, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [companyId, prod.code, prod.name, prod.category || null, prod.abbreviation || null, prod.unit || 'EA', prod.origin || '국내산', prod.purchasePrice || prod.purchase_price || 0, prod.salesPrice || prod.sales_price || 0, prod.taxType || prod.tax_type || '과세', prod.stock || 0]
         );
       }
     }
 
-    // 2.4 전표 및 전표상세
+    // 2.4 전표 및 전표상세 (인보이스는 ID 매핑을 거쳐 자식 아이템에 외래키 바인딩)
+    const invoiceIdMap = new Map();
+
     if (Array.isArray(backup.invoices)) {
       for (const inv of backup.invoices) {
-        await db.execute(
-          "INSERT INTO invoices (id, company_id, type, partner_name, date, total_amount, total_tax, total_sum, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [inv.id, companyId, inv.type, inv.partner_name, inv.date, inv.total_amount || 0, inv.total_tax || 0, inv.total_sum || 0, inv.status || '청구(외상)']
+        const insertedId = await db.executeInsert(
+          "INSERT INTO invoices (company_id, type, partner_name, date, total_amount, total_tax, total_sum, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [companyId, inv.type, inv.partner_name, inv.date, inv.total_amount || 0, inv.total_tax || 0, inv.total_sum || 0, inv.status || '청구(외상)'],
+          'id'
         );
+        invoiceIdMap.set(inv.id, insertedId);
       }
     }
     if (Array.isArray(backup.invoiceItems)) {
       for (const item of backup.invoiceItems) {
+        let intInvoiceId = invoiceIdMap.get(item.invoice_id);
+        if (!intInvoiceId) {
+          intInvoiceId = Number(item.invoice_id) || 0;
+        }
+
         await db.execute(
-          "INSERT INTO invoice_items (id, invoice_id, name, unit, origin, qty, price, amount, tax, total, is_tax_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [item.id, item.invoice_id, item.name, item.unit || 'EA', item.origin || '국내산', item.qty || 1, item.price || 0, item.amount || 0, item.tax || 0, item.total || 0, item.is_tax_applied ? 1 : 0]
+          "INSERT INTO invoice_items (invoice_id, name, unit, origin, qty, price, amount, tax, total, is_tax_applied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [intInvoiceId, item.name, item.unit || 'EA', item.origin || '국내산', item.qty || 1, item.price || 0, item.amount || 0, item.tax || 0, item.total || 0, item.is_tax_applied ? 1 : 0]
         );
       }
     }
@@ -1084,8 +1186,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.employees)) {
       for (const emp of backup.employees) {
         await db.execute(
-          "INSERT INTO employees (id, company_id, code, name, dept, position, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [emp.id, companyId, emp.code, emp.name, emp.dept || '', emp.position || '', emp.phone || '']
+          "INSERT INTO employees (company_id, code, name, dept, position, phone) VALUES (?, ?, ?, ?, ?, ?)",
+          [companyId, emp.code, emp.name, emp.dept || '', emp.position || '', emp.phone || '']
         );
       }
     }
@@ -1094,8 +1196,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.banks)) {
       for (const bank of backup.banks) {
         await db.execute(
-          "INSERT INTO banks (id, company_id, name, acc_no, owner, balance) VALUES (?, ?, ?, ?, ?, ?)",
-          [bank.id, companyId, bank.name, bank.acc_no, bank.owner || '', bank.balance || 0]
+          "INSERT INTO banks (company_id, name, acc_no, owner, balance) VALUES (?, ?, ?, ?, ?)",
+          [companyId, bank.name, bank.accNo || bank.acc_no, bank.owner || '', bank.balance || 0]
         );
       }
     }
@@ -1117,8 +1219,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.estimateItems)) {
       for (const item of backup.estimateItems) {
         await db.execute(
-          "INSERT INTO estimate_items (id, estimate_id, name, unit, type, qty, price, amount, tax, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [item.id, item.estimate_id, item.name, item.unit || 'EA', item.type || '벌', item.qty || 1, item.price || 0, item.amount || 0, item.tax || 0, item.total || 0]
+          "INSERT INTO estimate_items (estimate_id, name, unit, type, qty, price, amount, tax, total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [item.estimate_id, item.name, item.unit || 'EA', item.type || '벌', item.qty || 1, item.price || 0, item.amount || 0, item.tax || 0, item.total || 0]
         );
       }
     }
@@ -1127,8 +1229,8 @@ router.post('/backup/import', async (req, res) => {
     if (Array.isArray(backup.receivablesPayments)) {
       for (const rp of backup.receivablesPayments) {
         await db.execute(
-          "INSERT INTO receivables_payments (id, company_id, partner_name, recovered, paid, total_sales, total_purchases) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [rp.id, companyId, rp.partner_name, rp.recovered || 0, rp.paid || 0, rp.total_sales, rp.total_purchases]
+          "INSERT INTO receivables_payments (company_id, partner_name, recovered, paid, total_sales, total_purchases) VALUES (?, ?, ?, ?, ?, ?)",
+          [companyId, rp.partner_name, rp.recovered || 0, rp.paid || 0, rp.total_sales, rp.total_purchases]
         );
       }
     }
@@ -1138,13 +1240,13 @@ router.post('/backup/import', async (req, res) => {
       const s = backup.settings;
       await db.execute(
         "INSERT INTO settings (company_id, paper_size, margin_top, margin_left, font_size, logo_text, hk_f2, hk_f4, hk_f7, hk_f8, hk_f9, active_hq_id, uploaded_files_json, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [companyId, s.paper_size || 'A4', s.margin_top || 15, s.margin_left || 15, s.font_size || 10, s.logo_text || '[공급자 보관용]', s.hk_f2 || 'sales', s.hk_f4 || 'save', s.hk_f7 || 'purchase', s.hk_f8 || 'receivables', s.hk_f9 || 'excel-import', s.active_hq_id, s.uploaded_files_json || null, s.last_updated || 0]
+        [companyId, s.paperSize || s.paper_size || 'A4', s.marginTop || s.margin_top || 15, s.marginLeft || s.margin_left || 15, s.fontSize || s.font_size || 10, s.logoText || s.logo_text || '[공급자 보관용]', s.hkF2 || s.hk_f2 || 'sales', s.hkF4 || s.hk_f4 || 'save', s.hkF7 || s.hk_f7 || 'purchase', s.hkF8 || s.hk_f8 || 'receivables', s.hkF9 || s.hk_f9 || 'excel-import', s.activeHqId || s.active_hq_id, s.uploadedFilesJson || s.uploaded_files_json || null, s.lastUpdated || s.last_updated || 0]
       );
     }
 
     res.json({ success: true, message: "백업 데이터로부터 성공적으로 복구되었습니다." });
   } catch (err) {
-    console.error(err);
+    console.error("Backup import error:", err);
     res.status(500).json({ error: "백업 복구에 실패했습니다. 파일이 훼손되었거나 DB 에러가 발생했습니다." });
   }
 });

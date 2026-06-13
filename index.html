@@ -1139,6 +1139,9 @@
         </div>
 
         <div id="order-sheet-data-container" style="display: none; position: relative;">
+          <!-- 실시간 교차 검증 상태 패널 -->
+          <div id="order-sheet-validation-panel" class="no-print" style="margin-bottom: 20px; display: none;"></div>
+
           <!-- 일괄 전표 생성 영역 -->
           <div class="card" style="margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
@@ -1229,6 +1232,9 @@
             <button type="button" class="btn" id="btn-daily-verif-print" style="height: 38px; padding: 0 20px; font-weight: bold; margin-top: 18px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; display: none;"><i data-lucide="printer"></i> 확인서 인쇄하기</button>
           </div>
         </div>
+
+        <!-- 데이터 교차 검증 통계 패널 (물류 누락 방지용) -->
+        <div id="daily-verif-validation-panel" class="no-print" style="margin-bottom: 20px; display: none;"></div>
 
         <!-- 일일 품목확인서 렌더링 컨테이너 -->
         <div id="daily-verif-print-area" class="daily-verif-print-container">
@@ -1525,12 +1531,17 @@
     .daily-verif-table th, .daily-verif-table td {
       border: 1px solid rgba(255, 255, 255, 0.15);
       padding: 6px 4px;
-      height: 38px !important;
       width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
       box-sizing: border-box;
       outline: none;
       word-break: break-all;
       overflow: hidden;
+    }
+    .daily-verif-table th {
+      height: 35px !important;
+    }
+    .daily-verif-table td {
+      height: 25.5px !important;
     }
     /* 2열 마다 우측에 붉은색 경계선 강조 */
     .daily-verif-table th:nth-child(2n+1), 
@@ -1598,8 +1609,13 @@
         width: 100% !important;
       }
       .daily-verif-table th, .daily-verif-table td {
-        height: 38px !important;
         width: calc(100% / 14) !important; /* 모든 14개 열의 너비를 균일하게 고정 */
+      }
+      .daily-verif-table th {
+        height: 35px !important;
+      }
+      .daily-verif-table td {
+        height: 25.5px !important;
       }
       .daily-verif-table th {
         background: #e5e7eb !important;
@@ -1629,6 +1645,6 @@
   </style>
 
   <!-- ERP Logic Script -->
-  <script src="app.js?v=20260612_v3"></script>
+  <script src="app.js?v=20260612_v4"></script>
 </body>
 </html>

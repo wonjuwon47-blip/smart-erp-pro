@@ -15,7 +15,7 @@ const AUTO_MARKUP_MARGIN = 1.3;
 const INLINE_INPUT_STYLE = "background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:2px 4px; border-radius:4px;";
 
 // --- 실서버 통신용 절대 경로 Base URL 설정 (로컬 파일 index.html 기동 대응) ---
-const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'https://smart-erp-pro-24pu.onrender.com' : '';
+const API_BASE = (window.location.protocol === 'file:') ? 'https://smart-erp-pro-24pu.onrender.com' : '';
 
 // --- 전역 Fetch 인터셉터 (본사/지사 전환용 헤더 삽입) ---
 const originalFetch = window.fetch;
@@ -380,6 +380,14 @@ function saveDb() {
   renderReceivablesAndPayables();
   renderEstimatesList();
   
+  // 데이터 교차 검증 실시간 갱신 트리거
+  if (window.runDailyCrossValidation) {
+    try { window.runDailyCrossValidation(); } catch (e) { console.error("Daily verification validation error:", e); }
+  }
+  if (typeof runOrderSheetCrossValidation === "function") {
+    try { runOrderSheetCrossValidation(); } catch (e) { console.error("Order sheet validation error:", e); }
+  }
+  
   if (localStorage.getItem("erp_jwt_token") && !isSyncing) {
     syncToCloud();
   }
@@ -476,9 +484,9 @@ async function syncFromCloud() {
       updateDashboard();
       renderReceivablesAndPayables();
       renderEstimatesList();
-      renderHeadquarters();
-      renderEmployees();
-      renderBanks();
+      renderHqList();
+      renderEmployeeList();
+      renderBankList();
       renderPartners();
       renderProducts();
       renderSelectOptions();
@@ -512,8 +520,8 @@ async function smartSync() {
     }
     
     const serverData = await response.json();
-    const serverLastUpdated = (serverData.settings && serverData.settings.last_updated) 
-      ? Number(serverData.settings.last_updated) 
+    const serverLastUpdated = (serverData.settings && (serverData.settings.lastUpdated || serverData.settings.last_updated)) 
+      ? Number(serverData.settings.lastUpdated || serverData.settings.last_updated) 
       : 0;
     const localLastUpdated = (db.settings && db.settings.lastUpdated) 
       ? Number(db.settings.lastUpdated) 
@@ -853,6 +861,7 @@ if(formEmpAdd) {
   formEmpAdd.addEventListener("submit", (e) => {
     e.preventDefault();
     const newEmp = {
+      id: Math.floor(Math.random() * 2000000000) + 1,
       code: document.getElementById("emp-code").value,
       name: document.getElementById("emp-name").value,
       dept: document.getElementById("emp-dept").value,
@@ -899,6 +908,7 @@ if(formBankAdd) {
   formBankAdd.addEventListener("submit", (e) => {
     e.preventDefault();
     const newBank = {
+      id: Math.floor(Math.random() * 2000000000) + 1,
       name: document.getElementById("bank-name").value,
       accNo: document.getElementById("bank-acc-no").value,
       owner: document.getElementById("bank-owner").value,
@@ -1006,6 +1016,7 @@ if(formPartner) {
   formPartner.addEventListener("submit", (e) => {
     e.preventDefault();
     const updatedPartner = {
+      id: (editingPartnerIndex !== null && db.partners[editingPartnerIndex].id) ? db.partners[editingPartnerIndex].id : Math.floor(Math.random() * 2000000000) + 1,
       code: document.getElementById("partner-code").value,
       name: document.getElementById("partner-name").value,
       abbreviation: document.getElementById("partner-abbreviation").value,
@@ -1131,6 +1142,7 @@ if(formProduct) {
   formProduct.addEventListener("submit", (e) => {
     e.preventDefault();
     const updatedProduct = {
+      id: (editingProductIndex !== null && db.products[editingProductIndex].id) ? db.products[editingProductIndex].id : Math.floor(Math.random() * 2000000000) + 1,
       code: document.getElementById("prod-code").value,
       name: document.getElementById("prod-name").value,
       category: document.getElementById("prod-category").value,
@@ -4602,6 +4614,7 @@ function renderOrderSheetData() {
           const amtEl = tr.querySelector(".inline-amount");
           if (amtEl) amtEl.textContent = Math.round(qty * rowData.price).toLocaleString();
         }
+        runOrderSheetCrossValidation();
       });
       
       tbody.addEventListener("change", (e) => {
@@ -4624,6 +4637,7 @@ function renderOrderSheetData() {
         db.uploadedSchoolFiles = window.uploadedSchoolFiles;
         saveDb();
         recalculateOrderSheetStats();
+        runOrderSheetCrossValidation();
       });
       
       tbody.addEventListener("click", (e) => {
@@ -4690,6 +4704,131 @@ function renderOrderSheetData() {
       window.orderSheetTableEventsBound = true;
     }
   }
+  runOrderSheetCrossValidation();
+}
+
+// --- 통합 발주표와 실제 매출 전표 간 실시간 교차 검증 수행 ---
+function runOrderSheetCrossValidation() {
+  const validationPanel = document.getElementById("order-sheet-validation-panel");
+  if (!validationPanel) return;
+
+  if (!window.lastUploadedOrderData || !window.lastUploadedOrderData.rawRows) {
+    validationPanel.style.display = "none";
+    return;
+  }
+
+  validationPanel.style.display = "block";
+
+  let orderTotalQty = 0;
+  let orderTotalAmount = 0;
+  let orderTotalCount = 0;
+  
+  let migratedQty = 0;
+  let migratedAmount = 0;
+  let migratedCount = 0;
+
+  let pendingQty = 0;
+  let pendingAmount = 0;
+  let pendingCount = 0;
+
+  const orderKeys = new Set();
+
+  window.lastUploadedOrderData.rawRows.forEach(row => {
+    const status = row.status || "대기";
+    if (status === "취소") return;
+
+    const qty = Number(row.qty) || 0;
+    const price = Number(row.price) || 0;
+    const amount = Math.round(qty * price);
+
+    orderTotalQty += qty;
+    orderTotalAmount += amount;
+    orderTotalCount++;
+
+    if (row.date && row.school) {
+      orderKeys.add(`${row.date}||${row.school.trim()}`);
+    }
+
+    if (status === "이관 완료") {
+      migratedQty += qty;
+      migratedAmount += amount;
+      migratedCount++;
+    } else {
+      pendingQty += qty;
+      pendingAmount += amount;
+      pendingCount++;
+    }
+  });
+
+  const matchedSales = db.sales.filter(sale => {
+    const key = `${sale.date}||${(sale.partner || "").trim()}`;
+    return orderKeys.has(key);
+  });
+
+  let dbTotalQty = 0;
+  let dbTotalAmount = 0;
+  let dbTotalCount = 0;
+  let dbItemCount = 0;
+
+  matchedSales.forEach(sale => {
+    dbTotalCount++;
+    if (sale.items && Array.isArray(sale.items)) {
+      sale.items.forEach(item => {
+        dbItemCount++;
+        dbTotalQty += (Number(item.qty) || 0);
+        const amt = Number(item.amount) || Number(item.supplyValue) || 0;
+        dbTotalAmount += amt;
+      });
+    }
+  });
+
+  const qtyDiff = Math.abs(migratedQty - dbTotalQty);
+  const amtDiff = Math.abs(migratedAmount - dbTotalAmount);
+  
+  const isQtyMatch = qtyDiff < 0.01;
+  const isAmtMatch = amtDiff < 5;
+  const isMatch = isQtyMatch && isAmtMatch;
+
+  const statusColor = isMatch ? (pendingCount > 0 ? '#fbbf24' : '#10b981') : '#ef4444';
+  const statusGlow = isMatch ? (pendingCount > 0 ? '#fbbf24' : '#10b981') : '#ef4444';
+  
+  let statusText = "";
+  if (!isMatch) {
+    statusText = `⚠️ 매출 원장과 불일치 감지 (수량 오차: ${qtyDiff.toFixed(1)} kg/ea, 금액 오차: ${amtDiff.toLocaleString()}원)`;
+  } else if (pendingCount > 0) {
+    statusText = `⏳ 발주 데이터 일부 이관 완료 (대기: ${pendingCount}건, 이관완료: ${migratedCount}건)`;
+  } else {
+    statusText = `✅ 매출 원장과 100% 일치 (모든 발주 데이터 누락 없이 이관 완료)`;
+  }
+
+  validationPanel.innerHTML = `
+    <div class="card" style="background: rgba(30, 30, 42, 0.85); border: 1px solid ${!isMatch ? 'rgba(239, 68, 68, 0.4)' : (pendingCount > 0 ? 'rgba(251, 191, 36, 0.3)' : 'rgba(16, 185, 129, 0.3)')}; padding: 16px; border-radius: 8px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${statusColor}; box-shadow: 0 0 10px ${statusGlow};"></div>
+          <strong style="font-size: 1rem; color: #fff;">발주-매출 교차 검증 상태: </strong>
+          <span style="font-size: 0.95rem; font-weight: bold; color: ${!isMatch ? '#fca5a5' : (pendingCount > 0 ? '#fde047' : '#34d399')};">
+            ${statusText}
+          </span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 16px;">
+          <span>발주 총량: <strong>${orderTotalQty.toFixed(1)}</strong> (${orderTotalCount}건)</span>
+          <span>이관 완료 발주: <strong style="color: #fff;">${migratedQty.toFixed(1)}</strong> (${migratedCount}건)</span>
+          <span>매출 전표 실제 반영: <strong style="color: #fff;">${dbTotalQty.toFixed(1)}</strong> (${dbItemCount}개 품목)</span>
+        </div>
+      </div>
+      ${!isMatch ? `
+        <div style="margin: 8px 0 0 22px; font-size: 0.8rem; color: #fca5a5; line-height: 1.4;">
+          * 이관 완료된 발주 수량(${migratedQty.toFixed(1)})과 실제 매출 거래 관리에 기록된 수량(${dbTotalQty.toFixed(1)})이 일치하지 않습니다. <br>
+          * 매출 거래 관리에서 이관된 전표를 수기로 수정/삭제했거나, 발주표 셀 값을 직접 수정했는지 확인 바랍니다. 유통 물류 사고를 방지하기 위해 정합성을 반드시 점검해야 합니다.
+        </div>
+      ` : (pendingCount > 0 ? `
+        <div style="margin: 8px 0 0 22px; font-size: 0.8rem; color: #fde047; line-height: 1.4;">
+          * 아직 이관되지 않은 대기 상태의 발주 내역이 ${pendingCount}건 존재합니다. 우측 상단의 [매출에 일괄 등록] 버튼을 누르면 누락 없이 자동으로 이관 처리됩니다.
+        </div>
+      ` : '')}
+    </div>
+  `;
 }
 
 // --- 통합 발주표 합계 및 수량 통계 재계산 ---
@@ -4704,6 +4843,7 @@ function recalculateOrderSheetStats() {
   if (tableInfo) {
     tableInfo.innerHTML = `로드 수: <strong>${totalLoad}</strong>행 | 필터링: <strong>${totalFiltered}</strong>행 | 합계 금액: <strong>${grandTotalAmount.toLocaleString()}</strong>원`;
   }
+  runOrderSheetCrossValidation();
 }
 
 // --- 헤더 필터 시스템 셋업 및 동작 ---
@@ -6509,12 +6649,16 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderCellQty(qtyMap) {
     if (!qtyMap) return "";
     const parts = [];
+    const formatQty = (v) => {
+      const num = Number(v) || 0;
+      return Math.round(num * 10) / 10;
+    };
     if (qtyMap[""] > 0) {
-      parts.push(qtyMap[""]);
+      parts.push(formatQty(qtyMap[""]));
     }
     Object.keys(qtyMap).forEach(pref => {
       if (pref !== "" && qtyMap[pref] > 0) {
-        parts.push(`${pref}${qtyMap[pref]}`);
+        parts.push(`${pref}${formatQty(qtyMap[pref])}`);
       }
     });
     return parts.join(" ");
@@ -6534,11 +6678,76 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderDailyVerification(data, date) {
     const safeData = data || [];
     
+    // 원장 매출 데이터 교차 검증을 위한 원본 집계
+    const targetSales = db.sales ? db.sales.filter(s => s.date === date) : [];
+    const originalSalesCount = targetSales.length;
+    let originalTotalQty = 0;
+    const originalProductNames = new Set();
+    
+    targetSales.forEach(sale => {
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          originalTotalQty += (Number(item.qty) || 0);
+          originalProductNames.add(item.name);
+        });
+      }
+    });
+
+    // 실시간 교차 검증 도우미 함수 정의
+    window.runDailyCrossValidation = runCrossValidation;
+    function runCrossValidation() {
+      let currentTotalQty = 0;
+      const tables = dailyVerifPrintArea.querySelectorAll(".daily-verif-table");
+      tables.forEach(table => {
+        table.querySelectorAll(".qty-cell").forEach(cell => {
+          const qtyMap = parseQtyString(cell.textContent);
+          Object.values(qtyMap).forEach(v => {
+            currentTotalQty += v;
+          });
+        });
+      });
+      
+      const validationPanel = document.getElementById("daily-verif-validation-panel");
+      if (!validationPanel) return;
+      
+      const diff = Math.abs(originalTotalQty - currentTotalQty);
+      const isMatch = diff < 0.01; // 부동소수점 오차 감안
+      
+      validationPanel.style.display = "block";
+      validationPanel.innerHTML = `
+        <div class="card" style="background: rgba(30, 30, 42, 0.85); border: 1px solid ${isMatch ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.4)'}; padding: 16px; border-radius: 8px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 12px; height: 12px; border-radius: 50%; background-color: ${isMatch ? '#10b981' : '#ef4444'}; box-shadow: 0 0 10px ${isMatch ? '#10b981' : '#ef4444'};"></div>
+              <strong style="font-size: 1rem; color: #fff;">데이터 실시간 교차 검증 상태: </strong>
+              <span style="font-size: 0.95rem; font-weight: bold; color: ${isMatch ? '#34d399' : '#fca5a5'};">
+                ${isMatch ? '✅ 매출 원장과 100% 일치 (데이터 정합성 검증 완료)' : `⚠️ 매출 원장과 불일치 감지 (오차: ${diff.toFixed(1)} kg/ea)`}
+              </span>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; gap: 16px;">
+              <span>매출 전표: <strong>${originalSalesCount} 건</strong> (${originalProductNames.size}종 품목)</span>
+              <span>원장 총 수량: <strong style="color: #fff;">${originalTotalQty.toFixed(1)}</strong></span>
+              <span>확인서 실시간 총량: <strong style="color: #fff;">${currentTotalQty.toFixed(1)}</strong></span>
+            </div>
+          </div>
+          ${!isMatch ? `<p style="margin: 8px 0 0 22px; font-size: 0.8rem; color: #fca5a5; line-height: 1.4;">* 격자판 셀 데이터를 마우스로 클릭하여 수기로 수량을 변경했거나, 누락된 품목이 있는지 확인바랍니다. 수량이 정확히 매칭되어야 안심하고 물류를 배송할 수 있습니다.</p>` : ''}
+        </div>
+      `;
+    }
+    
     // 유효한 학교 목록 추출 및 정렬
     const validSchools = [...new Set(safeData.map(d => d.partner_name))].sort().filter(Boolean);
     
-    // 물품 목록은 통합된 이름(normalizedName)으로 추출 및 정렬
-    const normalizedProducts = [...new Set(safeData.map(d => parseAndNormalizeProduct(d.item_name).name))].sort().filter(Boolean);
+    // 물품 목록은 통합된 이름(normalizedName)으로 추출 및 정렬 (숫자로 시작하는 품목은 ㄱ~ㅎ 한글 뒤 맨 아래로 배치)
+    const normalizedProducts = [...new Set(safeData.map(d => parseAndNormalizeProduct(d.item_name).name))]
+      .filter(Boolean)
+      .sort((a, b) => {
+        const startsWithNumA = /^\d/.test(a);
+        const startsWithNumB = /^\d/.test(b);
+        if (startsWithNumA && !startsWithNumB) return 1;
+        if (!startsWithNumA && startsWithNumB) return -1;
+        return a.localeCompare(b, "ko");
+      });
 
     // 피벗 맵 (물품, 학교) -> { prefix: qty }
     const pivotMap = {};
@@ -6722,11 +6931,16 @@ document.addEventListener("DOMContentLoaded", () => {
               if (totalTd) {
                 totalTd.textContent = renderCellQty(rowTotals);
               }
+              // 실시간 교차 검증 상태 갱신
+              runCrossValidation();
             }
           });
         }
       });
     });
+
+    // 최초 1회 실시간 교차 검증 수행
+    runCrossValidation();
 
     if (btnDailyVerifPrint) btnDailyVerifPrint.style.display = "inline-block";
     if (window.lucide) lucide.createIcons();
