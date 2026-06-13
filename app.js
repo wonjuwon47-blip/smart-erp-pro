@@ -237,10 +237,28 @@ function prepareInvoicesForSync() {
   db.invoices = [];
   db.invoiceItems = [];
   
+  const invoiceIdMap = new Map();
+  const getIntId = (strId) => {
+    if (!strId) return Math.floor(Math.random() * 2000000000) + 1;
+    // 숫자이거나 이미 숫자로만 이루어진 경우 그대로 숫자로 반환
+    const num = Number(strId);
+    if (!isNaN(num)) return num;
+    
+    if (!invoiceIdMap.has(strId)) {
+      let randId;
+      do {
+        randId = Math.floor(Math.random() * 2000000000) + 1;
+      } while (Array.from(invoiceIdMap.values()).includes(randId));
+      invoiceIdMap.set(strId, randId);
+    }
+    return invoiceIdMap.get(strId);
+  };
+
   if (Array.isArray(db.sales)) {
     db.sales.forEach(sale => {
+      const intId = getIntId(sale.id);
       db.invoices.push({
-        id: sale.id,
+        id: intId,
         type: '매출',
         partner_name: sale.partner,
         date: sale.date,
@@ -252,10 +270,10 @@ function prepareInvoicesForSync() {
       
       if (Array.isArray(sale.items)) {
         sale.items.forEach(item => {
-          const itemId = "ITM-" + Date.now() + Math.random().toString(36).substring(2, 5);
+          const itemId = Math.floor(Math.random() * 2000000000) + 1;
           db.invoiceItems.push({
             id: itemId,
-            invoice_id: sale.id,
+            invoice_id: intId,
             name: item.name || item.productName || "",
             unit: item.unit || item.spec || "EA",
             origin: item.origin || "국산",
@@ -273,8 +291,9 @@ function prepareInvoicesForSync() {
   
   if (Array.isArray(db.purchases)) {
     db.purchases.forEach(pur => {
+      const intId = getIntId(pur.id);
       db.invoices.push({
-        id: pur.id,
+        id: intId,
         type: '매입',
         partner_name: pur.partner,
         date: pur.date,
@@ -286,10 +305,10 @@ function prepareInvoicesForSync() {
       
       if (Array.isArray(pur.items)) {
         pur.items.forEach(item => {
-          const itemId = "ITM-" + Date.now() + Math.random().toString(36).substring(2, 5);
+          const itemId = Math.floor(Math.random() * 2000000000) + 1;
           db.invoiceItems.push({
             id: itemId,
-            invoice_id: pur.id,
+            invoice_id: intId,
             name: item.name || item.productName || "",
             unit: item.unit || item.spec || "EA",
             origin: item.origin || "국산",
