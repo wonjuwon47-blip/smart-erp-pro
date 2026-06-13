@@ -191,9 +191,9 @@ const defaultDb = {
       supplier: 10.5,
       date: 23
     },
-    labelPreset: "60x60",
-    labelWidth: 60,
-    labelHeight: 60
+    labelPreset: "40x40",
+    labelWidth: 40,
+    labelHeight: 40
   },
   // 거래처별 수금/지급액 누계 (외상 관리용)
   receivablesPayments: {},
@@ -228,9 +228,9 @@ if (!db.settings.labelFonts) {
     date: 23
   };
 }
-if (db.settings.labelPreset === undefined) db.settings.labelPreset = "60x60";
-if (db.settings.labelWidth === undefined) db.settings.labelWidth = 60;
-if (db.settings.labelHeight === undefined) db.settings.labelHeight = 60;
+if (db.settings.labelPreset === undefined) db.settings.labelPreset = "40x40";
+if (db.settings.labelWidth === undefined) db.settings.labelWidth = 40;
+if (db.settings.labelHeight === undefined) db.settings.labelHeight = 40;
 
 // --- 매출/매입 데이터를 동기화용 인보이스 스펙으로 양방향 변환 ---
 function prepareInvoicesForSync() {
@@ -2107,7 +2107,7 @@ function getLabelHtml(sale) {
     }
 
     labelHtml += `
-      <div class="print-label-box" style="width: ${width}mm; height: ${height}mm; page-break-after: ${isLast ? 'avoid' : 'always'}; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin-bottom: 10px;">
+      <div class="print-label-box" style="width: ${width}mm; height: ${height}mm; page-break-after: ${isLast ? 'avoid' : 'always'}; box-sizing: border-box; border: 3px solid #000; font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #000; display: flex; flex-direction: column; margin: 0; padding: 0;">
         <!-- Row 1: 공급처 -->
         <div style="display: flex; height: 25%; border-bottom: 3px solid #000;">
           <div style="width: 15%; border-right: 3px solid #000; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; background: #fafafa;">공급처</div>
@@ -2147,7 +2147,18 @@ function triggerLabelPrintDoc(sale) {
     @media print {
       @page {
         size: ${width}mm ${height}mm;
-        margin: 0;
+        margin: 0mm;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: ${width}mm;
+        height: ${height}mm;
+      }
+      .print-label-box {
+        margin: 0 !important;
+        padding: 0 !important;
+        page-break-inside: avoid;
       }
     }
   `);
@@ -4203,8 +4214,8 @@ if (formLabel) {
       date: parseFloat(document.getElementById("setting-lbl-font-date").value) || 23
     };
     db.settings.labelPreset = document.getElementById("setting-lbl-size-preset").value;
-    db.settings.labelWidth = parseFloat(document.getElementById("setting-lbl-width").value) || 60;
-    db.settings.labelHeight = parseFloat(document.getElementById("setting-lbl-height").value) || 60;
+    db.settings.labelWidth = parseFloat(document.getElementById("setting-lbl-width").value) || 40;
+    db.settings.labelHeight = parseFloat(document.getElementById("setting-lbl-height").value) || 40;
 
     saveDb();
     alert("라벨 스티커 디자인 및 프린터 설정이 저장되었습니다.");
@@ -4227,6 +4238,7 @@ window.handleLabelPresetChange = function(presetValue) {
   heightEl.disabled = true;
   
   const specs = {
+    "40x40": { w: 40, h: 40, title: 16, product: 16, origin: 13, weight: 20, supplier: 8, date: 15 },
     "60x60": { w: 60, h: 60, title: 22, product: 22, origin: 18, weight: 28, supplier: 10.5, date: 23 },
     "80x80": { w: 80, h: 80, title: 28, product: 28, origin: 22, weight: 36, supplier: 14, date: 28 },
     "100x100": { w: 100, h: 100, title: 36, product: 36, origin: 28, weight: 46, supplier: 18, date: 36 },

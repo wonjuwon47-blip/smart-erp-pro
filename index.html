@@ -1373,7 +1373,8 @@
                 <div class="form-group">
                   <label>라벨 용지 규격 선택</label>
                   <select id="setting-lbl-size-preset" onchange="handleLabelPresetChange(this.value)">
-                    <option value="60x60">60mm x 60mm (기본 정사각형)</option>
+                    <option value="40x40">40mm x 40mm (소형 정사각형 ★기본)</option>
+                    <option value="60x60">60mm x 60mm (중형 정사각형)</option>
                     <option value="80x80">80mm x 80mm (대형 정사각형)</option>
                     <option value="100x100">100mm x 100mm (HPRT SL43 대형 규격)</option>
                     <option value="100x60">100mm x 60mm (HPRT SL43 직사각형)</option>
@@ -1384,11 +1385,11 @@
                 <div class="form-group" style="display: flex; flex-direction: row; gap: 12px; align-items: flex-end;">
                   <div style="flex: 1;">
                     <label>가로 크기 (Width, mm)</label>
-                    <input type="number" id="setting-lbl-width" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                    <input type="number" id="setting-lbl-width" value="40" min="20" max="150" step="1" disabled style="width: 100%;">
                   </div>
                   <div style="flex: 1;">
                     <label>세로 크기 (Height, mm)</label>
-                    <input type="number" id="setting-lbl-height" value="60" min="20" max="150" step="1" disabled style="width: 100%;">
+                    <input type="number" id="setting-lbl-height" value="40" min="20" max="150" step="1" disabled style="width: 100%;">
                   </div>
                 </div>
               </div>
