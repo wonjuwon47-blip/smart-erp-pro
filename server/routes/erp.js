@@ -1247,7 +1247,7 @@ router.post('/backup/import', async (req, res) => {
     res.json({ success: true, message: "백업 데이터로부터 성공적으로 복구되었습니다." });
   } catch (err) {
     console.error("Backup import error:", err);
-    res.status(500).json({ error: "백업 복구에 실패했습니다. 파일이 훼손되었거나 DB 에러가 발생했습니다." });
+    res.status(500).json({ error: "백업 복구에 실패했습니다. 사유: " + err.message });
   }
 });
 
