@@ -397,6 +397,15 @@ async function syncToCloud() {
   const token = localStorage.getItem("erp_jwt_token");
   if (!token) return;
   
+  // activeHqId 변환: "hq01" -> 1, "hq02" -> 2 등 정수형으로 치환하여 백엔드 DB(구버전 INTEGER)와 호환
+  let settingsPayload = db.settings;
+  if (db.settings) {
+    if (typeof db.settings.activeHqId === 'string' && db.settings.activeHqId.startsWith('hq')) {
+      const num = parseInt(db.settings.activeHqId.replace('hq', ''), 10);
+      settingsPayload = { ...db.settings, activeHqId: isNaN(num) ? 1 : num };
+    }
+  }
+
   isSyncing = true;
   try {
     const response = await fetch(API_BASE + "/api/erp/backup/import", {
@@ -414,7 +423,7 @@ async function syncToCloud() {
         invoiceItems: db.invoiceItems,
         employees: db.employees,
         banks: db.banks,
-        settings: db.settings,
+        settings: settingsPayload,
         receivablesPayments: db.receivablesPayments,
         estimates: db.estimates
       })
@@ -458,6 +467,14 @@ async function syncFromCloud() {
       db.settings = data.settings || db.settings;
       db.receivablesPayments = data.receivablesPayments || db.receivablesPayments || {};
       db.estimates = data.estimates || db.estimates || [];
+      
+      // activeHqId 복원: 숫자형(예: 1, 2)일 경우 프론트엔드가 사용하는 문자열("hq01", "hq02")로 재매핑
+      if (db.settings && db.settings.activeHqId !== undefined && db.settings.activeHqId !== null) {
+        const numVal = Number(db.settings.activeHqId);
+        if (!isNaN(numVal) && numVal > 0) {
+          db.settings.activeHqId = "hq" + String(numVal).padStart(2, '0');
+        }
+      }
       
       // uploadedSchoolFiles 복원 처리
       if (db.settings && db.settings.uploaded_files_json) {
